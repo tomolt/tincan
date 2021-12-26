@@ -1,0 +1,5 @@
+*.o
+*.d
+libtincan.a
+demo.elf
+Makefile
