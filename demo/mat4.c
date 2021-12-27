@@ -11,11 +11,11 @@ mat4_projection(tin_scalar fovy, tin_scalar aspect, tin_scalar near, tin_scalar 
 {
 	Mat4 D = {{ 0 }};
 	tin_scalar f = 1.0f / tanf(fovy * M_PI / 180.0f / 2.0f);
-	D.c[ 0] = f / aspect;
-	D.c[ 5] = f;
-	D.c[10] = (near + far) / (near - far);
-	D.c[11] = 2.0f * far * near / (near - far);
-	D.c[14] = -1.0f;
+	*M4(D,0,0) = f / aspect;
+	*M4(D,1,1) = f;
+	*M4(D,2,2) = (near + far) / (near - far);
+	*M4(D,2,3) = -1.0f;
+	*M4(D,3,2) = 2.0f * far * near / (near - far);
 	return D;
 }
 
@@ -68,6 +68,15 @@ mat4_from_transform(const tin_transform *transform)
 }
 
 Mat4
+mat4_from_inverse_transform(const tin_transform *transform)
+{
+	Mat4 R = mat4_rotation(tin_conjugate_qt(transform->rotation));
+	Mat4 T = mat4_translation(tin_neg_v3(transform->translation));
+	Mat4 S = mat4_scale(1.0f / transform->scale);
+	return mat4_multiply(mat4_multiply(R, S), T);
+}
+
+Mat4
 mat4_multiply(Mat4 A, Mat4 B)
 {
 	Mat4 D;
@@ -75,7 +84,7 @@ mat4_multiply(Mat4 A, Mat4 B)
 		for (int j = 0; j < 4; j++) {
 			tin_scalar f = 0.0f;
 			for (int k = 0; k < 4; k++) {
-				f += *M4(A,i,k) * *M4(B,k,j);
+				f += *M4(A,k,j) * *M4(B,i,k);
 			}
 			*M4(D,i,j) = f;
 		}

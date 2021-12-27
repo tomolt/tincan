@@ -7,5 +7,5 @@ typedef struct {
 void  render_init  (void);
 void  render_deinit(void);
 Model render_make_model(int nverts, const tin_vec3 *verts, int nindices, const GLushort *indices);
-void  render_model(const Model *model, const tin_transform *transform, int width, int height);
+void  render_model(const Model *model, const tin_transform *transform, const tin_transform *camera_transform, int width, int height);
 

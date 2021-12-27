@@ -2,12 +2,14 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <math.h>
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
 #include "render.h"
+#include "camera.h"
 
 #define MAX_OBJECTS 100
 
@@ -16,10 +18,12 @@ typedef struct {
 	Model   *model;
 } Object;
 
+static Camera camera;
 static Object objects[MAX_OBJECTS];
-static int num_objects;
+static int    num_objects;
 
-static Model cone_model;
+static tin_convex cone_shape;
+static Model      cone_model;
 
 static void
 init_cone(int tessel)
@@ -46,19 +50,77 @@ init_cone(int tessel)
 		indices[6*v+5] = tessel + 1;
 	}
 
+	cone_shape.type   = TIN_CONVEX;
+	cone_shape.verts  = verts;
+	cone_shape.nverts = nverts;
+
 	cone_model = render_make_model(nverts, verts, nindices, indices);
 	
-	free(verts);
 	free(indices);
 }
 
 static void
-key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
+key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
-	(void) scancode, (void) mode;
-	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-		glfwSetWindowShouldClose(window, GL_TRUE);
+	(void) scancode, (void) mods;
+
+	if (action == GLFW_REPEAT) return;
+	
+	switch (key) {
+	case GLFW_KEY_ESCAPE:
+		if (action == GLFW_PRESS) {
+			glfwSetWindowShouldClose(window, GL_TRUE);
+		}
+		break;
+
+	case GLFW_KEY_W: camera.f = action == GLFW_PRESS; break;
+	case GLFW_KEY_A: camera.l = action == GLFW_PRESS; break;
+	case GLFW_KEY_S: camera.b = action == GLFW_PRESS; break;
+	case GLFW_KEY_D: camera.r = action == GLFW_PRESS; break;
+	
+	case GLFW_KEY_LEFT_ALT:
+		if (action == GLFW_RELEASE) {
+			int mode = glfwGetInputMode(window, GLFW_CURSOR);
+			if (mode == GLFW_CURSOR_NORMAL) {
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+				glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
+			} else {
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+			}
+		}
+		break;
 	}
+}
+
+static void
+mouse_callback(GLFWwindow *window, double x, double y)
+{
+	(void) window;
+
+	int mode = glfwGetInputMode(window, GLFW_CURSOR);
+	if (mode != GLFW_CURSOR_DISABLED) return;
+
+        float dx = x - camera.cursor_x;
+        float dy = y - camera.cursor_y;
+
+        camera.yaw -= dx * 0.003f;
+        while (camera.yaw < 0.0f) {
+                camera.yaw += 2.0f * M_PI;
+        }
+        while (camera.yaw >= 2.0f * M_PI) {
+                camera.yaw -= 2.0f * M_PI;
+        }
+
+        camera.pitch -= dy * 0.003f;
+        if (camera.pitch < -0.5f * M_PI) {
+                camera.pitch = -0.5f * M_PI;
+        }
+        if (camera.pitch > 0.5f * M_PI) {
+                camera.pitch = 0.5f * M_PI;
+        }
+
+        camera.cursor_x = x;
+        camera.cursor_y = y;
 }
 
 int
@@ -72,12 +134,16 @@ main(void)
 
 	GLFWwindow *window = glfwCreateWindow(800, 600, "tincan physics demo", NULL, NULL);
 	glfwSetKeyCallback(window, key_callback);
+	glfwSetCursorPosCallback(window, mouse_callback);
 
 	glfwMakeContextCurrent(window);
 	gladLoadGL(glfwGetProcAddress);
 	glEnable(GL_DEPTH_TEST);
 	render_init();
 	init_cone(16);
+
+	camera.quat = (tin_quat) { {{ 0.0f, 0.0f, 0.0f }}, 1.0f };
+	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
 
 	objects[num_objects++] = (Object) {
 		{
@@ -86,13 +152,14 @@ main(void)
 				(tin_vec3) {{ 0.0f, 0.0f, -5.0f }},
 				1.0f
 			},
-			NULL
+			(tin_shape *) &cone_shape
 		},
 		&cone_model
 	};
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
+		camera_update(&camera, 1.0f / 60.0f);
 
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
@@ -103,7 +170,9 @@ main(void)
 
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
-			render_model(obj->model, &obj->body.transform, width, height);
+			tin_transform camtrf;
+			camera_transform(&camera, &camtrf);
+			render_model(obj->model, &obj->body.transform, &camtrf, width, height);
 		}
 
 		glfwSwapBuffers(window);

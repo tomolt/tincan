@@ -154,14 +154,16 @@ render_make_model(int nverts, const tin_vec3 *verts, int nindices, const GLushor
 }
 
 void
-render_model(const Model *model, const tin_transform *transform, int width, int height)
+render_model(const Model *model, const tin_transform *transform, const tin_transform *camera_transform, int width, int height)
 {
 	glUseProgram(model_prog);
 	glBindVertexArray(model_vao);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model_ibo);
 
 	Mat4 model_matrix = mat4_from_transform(transform);
-	glUniformMatrix4fv(model_uniforms[0], 1, GL_FALSE, model_matrix.c);
+	Mat4 view_matrix = mat4_from_inverse_transform(camera_transform);
+	Mat4 model_view_matrix = mat4_multiply(view_matrix, model_matrix);
+	glUniformMatrix4fv(model_uniforms[0], 1, GL_FALSE, model_view_matrix.c);
 	Mat4 proj_matrix = mat4_projection(70.0f, (float) width / height, 1.0f, 100.0f);
 	glUniformMatrix4fv(model_uniforms[1], 1, GL_FALSE, proj_matrix.c);
 	tin_vec3 light_dir = tin_normalize_v3((tin_vec3) {{ -1.0f, -1.0f, 0.0f }});
