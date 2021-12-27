@@ -17,6 +17,9 @@ static GLuint model_ibo;
 static GLuint model_vao;
 static GLuint model_uniforms[4];
 
+static GLsizei model_vbo_count;
+static GLsizei model_ibo_count;
+
 static const char *model_vert_src =
 	"#version 330 core\n"
 	"uniform mat4 model_view_matrix;\n"
@@ -104,10 +107,12 @@ render_init(void)
 	glGenBuffers(1, &model_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, model_vbo);
 	glBufferData(GL_ARRAY_BUFFER, VBO_CAPACITY, NULL, GL_STATIC_DRAW);
+	model_vbo_count = 0;
 
 	glGenBuffers(1, &model_ibo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model_ibo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, IBO_CAPACITY, NULL, GL_STATIC_DRAW);
+	model_ibo_count = 0;
 
 	glGenVertexArrays(1, &model_vao);
 	glBindVertexArray(model_vao);
@@ -124,6 +129,30 @@ render_deinit(void)
 	glDeleteProgram(model_prog);
 }
 
+Model
+render_make_model(int nverts, const tin_vec3 *verts, int nindices, const GLushort *indices)
+{
+	Model model = {
+		.base_index  = model_ibo_count,
+		.base_vertex = model_vbo_count,
+		.index_count = nindices
+	};
+
+	glBindBuffer(GL_ARRAY_BUFFER, model_vbo);
+	glBufferSubData(GL_ARRAY_BUFFER,
+		model_vbo_count * sizeof (tin_vec3),
+		nverts * sizeof (tin_vec3), verts);
+	model_vbo_count += nverts;
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model_ibo);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER,
+		model_ibo_count * sizeof (GLushort),
+		nindices * sizeof (GLushort), indices);
+	model_ibo_count += nindices;
+
+	return model;
+}
+
 void
 render_model(const Model *model, const tin_transform *transform, int width, int height)
 {
@@ -133,12 +162,12 @@ render_model(const Model *model, const tin_transform *transform, int width, int 
 
 	Mat4 model_matrix = mat4_from_transform(transform);
 	glUniformMatrix4fv(model_uniforms[0], 1, GL_FALSE, model_matrix.c);
-	Mat4 proj_matrix = mat4_projection(70.0f, (float) width / height, 0.1f, 100.0f);
+	Mat4 proj_matrix = mat4_projection(70.0f, (float) width / height, 1.0f, 100.0f);
 	glUniformMatrix4fv(model_uniforms[1], 1, GL_FALSE, proj_matrix.c);
 	glUniform3f(model_uniforms[2], 0.0f, -1.0f, 0.0f);
-	glUniform3f(model_uniforms[3], 1.0f, 1.0f, 1.0f);
+	glUniform4f(model_uniforms[3], 1.0f, 1.0f, 1.0f, 1.0f);
 
 	glDrawElementsBaseVertex(GL_TRIANGLES, model->index_count,
-		GL_UNSIGNED_SHORT, (void *) model->base_index, model->base_vertex);
+		GL_UNSIGNED_SHORT, (void *) (model->base_index * sizeof (GLushort)), model->base_vertex);
 }
 

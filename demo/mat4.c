@@ -37,6 +37,9 @@ static Mat4
 mat4_translation(tin_vec3 t)
 {
 	Mat4 M = {{ 0 }};
+	*M4(M,0,0) = 1.0f;
+	*M4(M,1,1) = 1.0f;
+	*M4(M,2,2) = 1.0f;
 	*M4(M,3,0) = t.c[0];
 	*M4(M,3,1) = t.c[1];
 	*M4(M,3,2) = t.c[2];
