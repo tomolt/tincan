@@ -12,7 +12,7 @@
 
 typedef struct {
 	tin_body body;
-	ModelRef model;
+	Model   *model;
 } Object;
 
 static Object objects[MAX_OBJECTS];
@@ -53,7 +53,7 @@ main(void)
 
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
-			render_model(obj->model, &obj->body.transform);
+			render_model(obj->model, &obj->body.transform, WIDTH, HEIGHT);
 		}
 
 		glfwSwapBuffers(window);
