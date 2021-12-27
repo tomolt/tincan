@@ -112,6 +112,8 @@ tin_prlgram_area(tin_vec3 e1, tin_vec3 e2)
 	return sqrtf(tin_dot_v3(e1, e1) * tin_dot_v3(perp, perp));
 }
 
+#if 0
+
 tin_vec3
 tin_polytope_support(const tin_polytope *p, tin_vec3 dir)
 {
@@ -126,8 +128,6 @@ tin_polytope_support(const tin_polytope *p, tin_vec3 dir)
 	}
 	return p->coords[best_i];
 }
-
-#if 0
 
 void
 tin_support(const Body *former, const Body *latter, tin_vec3 dir, tin_mspoint *sup)

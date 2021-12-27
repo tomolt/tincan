@@ -5,6 +5,8 @@
 
 #include <tincan.h>
 
+#include "render.h"
+
 static GLuint shader_prog;
 
 static const char *shader_vert_src =
@@ -90,5 +92,10 @@ void
 render_deinit(void)
 {
 	glDeleteProgram(shader_prog);
+}
+
+void
+render_model(ModelRef model, const tin_transform *transform)
+{
 }
 

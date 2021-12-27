@@ -24,7 +24,7 @@ $(for s in $srcs; do echo ${s%.c}.o \\; done)
 
 $1/%.o: \$(PROJ_ROOT)/$1/%.c
 	@echo CC \$@
-	@\$(CC) \$(CFLAGS) \$< -c -o \$@ $2
+	@\$(CC) \$(CFLAGS) \$< -c -o \$@ -MMD -MP $2
 
 -include \$(${SUBPROJ}_OBJS:.o=.d)
 

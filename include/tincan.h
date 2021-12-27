@@ -34,20 +34,39 @@ tin_quat tin_conjugate_qt(tin_quat q);
 tin_vec3 tin_gram_schmidt(tin_vec3 fixed, tin_vec3 var);
 tin_scalar tin_prlgram_area(tin_vec3 e1, tin_vec3 e2);
 
-typedef struct {
-	const tin_vec3 *coords;
-	int nverts;
-} tin_polytope;
+/* Transforms */
 
-tin_vec3 tin_polytope_support(const tin_polytope *p, tin_vec3 dir);
+typedef struct {
+	tin_quat   rotation;
+	tin_vec3   translation;
+	tin_scalar scale;
+} tin_transform;
+
+/* Shapes */
+
+#define TIN_SPHERE 's'
+#define TIN_CONVEX 'c'
+
+typedef struct {
+	int       type;
+	tin_vec3 *verts;
+	int       nverts;
+} tin_convex;
+
+typedef struct {
+	int type;
+} tin_shape;
+
+tin_vec3 tin_convex_support(const tin_convex *shape, tin_vec3 dir);
+
+/* Rigid Bodies */
+
+typedef struct {
+	tin_transform transform;
+	tin_shape    *shape;
+} tin_body;
 
 #if 0
-
-typedef struct {
-	const tin_polytope *polytope;
-	tin_vec3 translation;
-	tin_quat rotation;
-} tin_body;
 
 typedef struct {
 	tin_vec3 origin;

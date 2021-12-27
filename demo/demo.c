@@ -8,6 +8,16 @@
 
 #include "render.h"
 
+#define MAX_OBJECTS 100
+
+typedef struct {
+	tin_body body;
+	ModelRef model;
+} Object;
+
+static Object objects[MAX_OBJECTS];
+static int num_objects;
+
 const GLuint WIDTH = 800, HEIGHT = 600;
 
 void
@@ -41,7 +51,10 @@ main(void)
 		glClearColor(0.7f, 0.9f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-
+		for (int o = 0; o < num_objects; o++) {
+			const Object *obj = &objects[o];
+			render_model(obj->model, &obj->body.transform);
+		}
 
 		glfwSwapBuffers(window);
 	}
