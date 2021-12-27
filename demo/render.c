@@ -164,7 +164,8 @@ render_model(const Model *model, const tin_transform *transform, int width, int 
 	glUniformMatrix4fv(model_uniforms[0], 1, GL_FALSE, model_matrix.c);
 	Mat4 proj_matrix = mat4_projection(70.0f, (float) width / height, 1.0f, 100.0f);
 	glUniformMatrix4fv(model_uniforms[1], 1, GL_FALSE, proj_matrix.c);
-	glUniform3f(model_uniforms[2], 0.0f, -1.0f, 0.0f);
+	tin_vec3 light_dir = tin_normalize_v3((tin_vec3) {{ -1.0f, -1.0f, 0.0f }});
+	glUniform3fv(model_uniforms[2], 1, light_dir.c);
 	glUniform4f(model_uniforms[3], 1.0f, 1.0f, 1.0f, 1.0f);
 
 	glDrawElementsBaseVertex(GL_TRIANGLES, model->index_count,

@@ -52,8 +52,6 @@ init_cone(int tessel)
 	free(indices);
 }
 
-static const GLuint WIDTH = 800, HEIGHT = 600;
-
 static void
 key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
@@ -72,7 +70,7 @@ main(void)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "tincan physics demo", NULL, NULL);
+	GLFWwindow *window = glfwCreateWindow(800, 600, "tincan physics demo", NULL, NULL);
 	glfwSetKeyCallback(window, key_callback);
 
 	glfwMakeContextCurrent(window);
@@ -96,12 +94,16 @@ main(void)
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
+		int width, height;
+		glfwGetWindowSize(window, &width, &height);
+		glViewport(0, 0, width, height);
+
 		glClearColor(0.7f, 0.9f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
-			render_model(obj->model, &obj->body.transform, WIDTH, HEIGHT);
+			render_model(obj->model, &obj->body.transform, width, height);
 		}
 
 		glfwSwapBuffers(window);
