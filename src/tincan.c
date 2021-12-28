@@ -112,38 +112,38 @@ tin_prlgram_area(tin_vec3 e1, tin_vec3 e2)
 	return sqrtf(tin_dot_v3(e1, e1) * tin_dot_v3(perp, perp));
 }
 
-#if 0
-
 tin_vec3
 tin_polytope_support(const tin_polytope *p, tin_vec3 dir)
 {
 	tin_scalar score, best_score = -INFINITY;
 	int i, best_i = -1;
-	for (i = 0; i < p->nverts; i++) {
-		score = tin_dot_v3(p->coords[i], dir);
+	for (i = 0; i < p->num_vertices; i++) {
+		score = tin_dot_v3(p->vertices[i], dir);
 		if (score > best_score) {
 			best_score = score;
 			best_i     = i;
 		}
 	}
-	return p->coords[best_i];
+	return p->vertices[best_i];
 }
 
 void
-tin_support(const Body *former, const Body *latter, tin_vec3 dir, tin_mspoint *sup)
+tin_polysum_support(const tin_polysum *p, tin_vec3 dir, tin_pspoint *sup)
 {
-	tin_vec3 a_dir = tin_apply_qt(tin_conjugate_qt(m->a.rotation), dir);
-	sup->a_local = polytope_support(m->a.polytope, a_dir);
-	tin_vec3 a_global = tin_apply_qt(m->a.rotation, sup->a_local);
-	a_global = tin_add_v3(m->a.translation, a_global);
+	tin_vec3 former_dir = tin_apply_qt(tin_conjugate_qt(p->former_transform->rotation), dir);
+	sup->rel_former = tin_polytope_support(p->former_polytope, former_dir);
+	tin_vec3 former_abs = tin_apply_qt(p->former_transform->rotation, sup->rel_former);
+	former_abs = tin_add_v3(p->former_transform->translation, former_abs);
 
-	tin_vec3 b_dir = tin_apply_qt(tin_conjugate_qt(m->b.rotation), tin_neg_v3(dir));
-	sup->b_local = polytope_support(m->b.polytope, b_dir);
-	tin_vec3 b_global = tin_apply_qt(m->b.rotation, sup->b_local);
-	b_global = tin_add_v3(m->b.translation, b_global);
+	tin_vec3 latter_dir = tin_apply_qt(tin_conjugate_qt(p->latter_transform->rotation), tin_neg_v3(dir));
+	sup->rel_latter = tin_polytope_support(p->latter_polytope, latter_dir);
+	tin_vec3 latter_abs = tin_apply_qt(p->latter_transform->rotation, sup->rel_latter);
+	latter_abs = tin_add_v3(p->latter_transform->translation, latter_abs);
 
-	sup->global = tin_sub_v3(a_global, b_global);
+	sup->abs = tin_sub_v3(former_abs, latter_abs);
 }
+
+#if 0
 
 static int
 construct_portal(const Minkowski *m, const Ray *r, Portal *p)

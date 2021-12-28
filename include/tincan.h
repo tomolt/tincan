@@ -42,15 +42,6 @@ typedef struct {
 	tin_scalar scale;
 } tin_transform;
 
-/* Polytopes */
-
-typedef struct {
-	tin_vec3 *vertices;
-	int       num_vertices;
-} tin_polytope;
-
-tin_vec3 tin_polytope_support(const tin_polytope *p, tin_vec3 dir);
-
 /* Shapes */
 
 #define TIN_SPHERE 's'
@@ -64,24 +55,43 @@ typedef struct {
 	int           shape;
 } tin_body;
 
-#if 0
+/* Polytopes */
+
+typedef struct {
+	tin_vec3 *vertices;
+	int       num_vertices;
+} tin_polytope;
+
+tin_vec3 tin_polytope_support(const tin_polytope *p, tin_vec3 dir);
+
+/* Minkowski sum (difference) of transformed convex polytopes */
+typedef struct {
+	const tin_polytope  *former_polytope;
+	const tin_transform *former_transform;
+	const tin_polytope  *latter_polytope;
+	const tin_transform *latter_transform;
+} tin_polysum;
+
+/* A point in a polytope sum */
+typedef struct {
+	tin_vec3 abs;
+	tin_vec3 rel_former;
+	tin_vec3 rel_latter;
+} tin_pspoint;
+
+void tin_polysum_support(const tin_polysum *p, tin_vec3 dir, tin_pspoint *sup);
 
 typedef struct {
 	tin_vec3 origin;
 	tin_vec3 dir;
 } tin_ray;
 
-/* A point in the Minkowski sum of two bodies */
 typedef struct {
-	tin_vec3 global;
-	tin_vec3 former_rel;
-	tin_vec3 latter_rel;
-} tin_mspoint;
-
-typedef struct {
-	tin_mspoint a, b, c;
+	tin_pspoint a, b, c;
 	tin_vec3    normal;
 } tin_portal;
+
+#if 0
 
 typedef struct {
 	tin_vec3   former_rel;
