@@ -176,6 +176,7 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 		p->a = p->b;
 		p->b = temp;
 	}
+	tin_scalar threshold = tin_dot_v3(dir, p->a.abs);
 	
 	for (int it = 0;; it++) {
 		if (it >= 100) {
@@ -189,7 +190,7 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 		}
 
 		tin_polysum_support(s, dir, &p->c);
-		if (tin_dot_v3(dir, p->c.abs) <= 0.0f) {
+		if (tin_dot_v3(dir, p->c.abs) <= threshold) {
 			return 0;
 		}
 		
@@ -206,16 +207,18 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 		/* if <D , (OB x OC)> < 0 */
 		ob = tin_sub_v3(p->b.abs, r->origin);
 		if (-tin_dot_v3(ob, d_x_oc) < 0.0f) {
-			p->a = p->c; /* throw away A */
 			dir = tin_cross_v3(oc, ob);
+			threshold = tin_dot_v3(dir, p->a.abs);
+			p->a = p->c; /* throw away A */
 			continue;
 		}
 		
 		/* if <D , (OC x OA)> < 0 */
 		oa = tin_sub_v3(p->a.abs, r->origin);
 		if (tin_dot_v3(oa, d_x_oc) < 0.0f) {
-			p->b = p->c; /* throw away B */
 			dir = tin_cross_v3(oa, oc);
+			threshold = tin_dot_v3(dir, p->b.abs);
+			p->b = p->c; /* throw away B */
 			continue;
 		}
 		
