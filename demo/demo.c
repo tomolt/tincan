@@ -8,6 +8,7 @@
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
+#include "mat4.h"
 #include "render.h"
 #include "camera.h"
 
@@ -185,6 +186,12 @@ main(void)
 		tin_transform camtrf;
 		camera_transform(&camera, &camtrf);
 
+		tin_transform ident = { .rotation = { {{ 0.0f, 0.0f, 0.0f }}, 1.0f }, .scale = 1.0f };
+
+		render_start_models();
+		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);
+		render_view_matrix = mat4_from_inverse_transform(&camtrf);
+
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
 			tin_polytope dot;
@@ -192,7 +199,6 @@ main(void)
 			dot.vertices = malloc(1 * sizeof *dot.vertices);
 			dot.vertices[0] = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
 			tin_polysum sum;
-			tin_transform ident = { .rotation = { {{ 0.0f, 0.0f, 0.0f }}, 1.0f }, .scale = 1.0f };
 			sum.former_polytope = obj->body.shape_params;
 			sum.former_transform = &obj->body.transform;
 			sum.latter_polytope = &dot;
@@ -205,8 +211,20 @@ main(void)
 			} else {
 				color = (tin_vec3) {{ 1.0f, 1.0f, 1.0f }};
 			}
-			render_model(obj->model, &obj->body.transform, &camtrf, width, height, color);
+			render_draw_model(obj->model, &obj->body.transform, color);
 		}
+
+		render_start_overlay();
+		render_proj_matrix = mat4_orthographic(width, height);
+		render_view_matrix = mat4_from_transform(&ident);
+
+		int cx = width / 2;
+		int cy = height / 2;
+		render_push_vertex((tin_vec3) {{ cx-6, cy }});
+		render_push_vertex((tin_vec3) {{ cx+5, cy }});
+		render_push_vertex((tin_vec3) {{ cx, cy-5 }});
+		render_push_vertex((tin_vec3) {{ cx, cy+6 }});
+		render_draw_lines((tin_vec3) {{ 1.0f, 1.0f, 1.0f }});
 
 		glfwSwapBuffers(window);
 	}

@@ -7,7 +7,7 @@
 #define M4(A,i,j) ((A.c)+4*(i)+(j))
 
 Mat4
-mat4_projection(tin_scalar fovy, tin_scalar aspect, tin_scalar near, tin_scalar far)
+mat4_perspective(tin_scalar fovy, tin_scalar aspect, tin_scalar near, tin_scalar far)
 {
 	Mat4 D = {{ 0 }};
 	tin_scalar f = 1.0f / tanf(fovy * M_PI / 180.0f / 2.0f);
@@ -16,6 +16,20 @@ mat4_projection(tin_scalar fovy, tin_scalar aspect, tin_scalar near, tin_scalar 
 	*M4(D,2,2) = (near + far) / (near - far);
 	*M4(D,2,3) = -1.0f;
 	*M4(D,3,2) = 2.0f * far * near / (near - far);
+	return D;
+}
+
+Mat4
+mat4_orthographic(int width, int height)
+{
+	Mat4 D = {{ 0 }};
+	*M4(D,0,0) =  2.0f / width;
+	*M4(D,1,1) =  2.0f / height;
+	*M4(D,2,2) = -1.0f;
+	*M4(D,3,0) = -1.0f;
+	*M4(D,3,1) = -1.0f;
+	*M4(D,3,2) =  0.0f;
+	*M4(D,3,3) =  1.0f;
 	return D;
 }
 
