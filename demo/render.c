@@ -154,7 +154,7 @@ render_make_model(int nverts, const tin_vec3 *verts, int nindices, const GLushor
 }
 
 void
-render_model(const Model *model, const tin_transform *transform, const tin_transform *camera_transform, int width, int height)
+render_model(const Model *model, const tin_transform *transform, const tin_transform *camera_transform, int width, int height, tin_vec3 color)
 {
 	glUseProgram(model_prog);
 	glBindVertexArray(model_vao);
@@ -168,7 +168,7 @@ render_model(const Model *model, const tin_transform *transform, const tin_trans
 	glUniformMatrix4fv(model_uniforms[1], 1, GL_FALSE, proj_matrix.c);
 	tin_vec3 light_dir = tin_normalize_v3((tin_vec3) {{ -1.0f, -1.0f, 0.0f }});
 	glUniform3fv(model_uniforms[2], 1, light_dir.c);
-	glUniform4f(model_uniforms[3], 1.0f, 1.0f, 1.0f, 1.0f);
+	glUniform4f(model_uniforms[3], color.c[0], color.c[1], color.c[2], 1.0f);
 
 	glDrawElementsBaseVertex(GL_TRIANGLES, model->index_count,
 		GL_UNSIGNED_SHORT, (void *) (model->base_index * sizeof (GLushort)), model->base_vertex);

@@ -168,12 +168,12 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 	
 	for (int it = 0;; it++) {
 		if (it >= 100) {
-			fprintf(stderr, "MPR construct_portal() took too many iterations.");
+			//fprintf(stderr, "MPR construct_portal() took too many iterations.\n");
 			return 0;
 		}
 
 		if (tin_dot_v3(dir, dir) == 0.0f) {
-			fprintf(stderr, "Portal collapsed during construction. (it=%d)", it);
+			//fprintf(stderr, "Portal collapsed during construction. (it=%d)\n", it);
 			return 0;
 		}
 

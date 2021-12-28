@@ -182,11 +182,30 @@ main(void)
 		glClearColor(0.7f, 0.9f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		tin_transform camtrf;
+		camera_transform(&camera, &camtrf);
+
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
-			tin_transform camtrf;
-			camera_transform(&camera, &camtrf);
-			render_model(obj->model, &obj->body.transform, &camtrf, width, height);
+			tin_polytope dot;
+			dot.num_vertices = 1;
+			dot.vertices = malloc(1 * sizeof *dot.vertices);
+			dot.vertices[0] = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
+			tin_polysum sum;
+			tin_transform ident = { .rotation = { {{ 0.0f, 0.0f, 0.0f }}, 1.0f }, .scale = 1.0f };
+			sum.former_polytope = obj->body.shape_params;
+			sum.former_transform = &obj->body.transform;
+			sum.latter_polytope = &dot;
+			sum.latter_transform = &ident;
+			tin_ray ray = { .origin = camtrf.translation, .dir = tin_apply_qt(camtrf.rotation, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }}) };
+			tin_vec3 color;
+			tin_portal portal;
+			if (tin_construct_portal(&sum, &ray, &portal)) {
+				color = (tin_vec3) {{ 1.0f, 0.0f, 0.0f }};
+			} else {
+				color = (tin_vec3) {{ 1.0f, 1.0f, 1.0f }};
+			}
+			render_model(obj->model, &obj->body.transform, &camtrf, width, height, color);
 		}
 
 		glfwSwapBuffers(window);
