@@ -147,19 +147,30 @@ tin_polysum_support(const tin_polysum *s, tin_vec3 dir, tin_pspoint *sup)
 int
 tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 {
+	tin_vec3 oa, ob, oc;
+
 	tin_vec3 dir = r->dir;
 	tin_polysum_support(s, dir, &p->a);
+	oa = tin_sub_v3(p->a.abs, r->origin);
 
-	tin_vec3 oa = tin_sub_v3(p->a.abs, r->origin);
-	dir = tin_gram_schmidt(oa, (tin_vec3) {{ 1.0f, 0.0f, 0.0f }});
+	dir = tin_sub_v3(r->dir, tin_normalize_v3(oa));
 	if (tin_dot_v3(dir, dir) == 0.0f) {
-		dir = (tin_vec3) {{ 0.0f, 0.0f, 1.0f }};
+		dir = tin_gram_schmidt(oa, (tin_vec3) {{ 1.0f, 0.0f, 0.0f }});
+		dir = tin_normalize_v3(dir);
+		if (tin_dot_v3(dir, dir) == 0.0f) {
+			dir = (tin_vec3) {{ 0.0f, 0.0f, 1.0f }};
+		}
 	}
-	tin_polysum_support(s, dir, &p->b);
 
-	dir = tin_cross_v3(tin_sub_v3(p->a.abs, r->origin), tin_sub_v3(p->b.abs, r->origin));
+	tin_polysum_support(s, dir, &p->b);
+	ob = tin_sub_v3(p->b.abs, r->origin);
+
+	dir = tin_cross_v3(oa, ob);
+	if (tin_dot_v3(dir, dir) == 0.0f) {
+		return 0;
+	}
 	if (tin_dot_v3(dir, r->dir) < 0.0f) {
-		dir = tin_scale_v3(-1.0f, dir);
+		dir = tin_neg_v3(dir);
 		/* preserve ccw winding */
 		tin_pspoint temp = p->a;
 		p->a = p->b;
@@ -168,12 +179,12 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 	
 	for (int it = 0;; it++) {
 		if (it >= 100) {
-			//fprintf(stderr, "MPR construct_portal() took too many iterations.\n");
+			fprintf(stderr, "Portal construction took too many iterations.\n");
 			return 0;
 		}
 
 		if (tin_dot_v3(dir, dir) == 0.0f) {
-			//fprintf(stderr, "Portal collapsed during construction. (it=%d)\n", it);
+			fprintf(stderr, "Portal collapsed during construction. (it=%d)\n", it);
 			return 0;
 		}
 
@@ -182,11 +193,18 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 			return 0;
 		}
 		
-		tin_vec3 oc = tin_sub_v3(p->c.abs, r->origin);
+		tin_vec3 normal = tin_cross_v3(
+			tin_sub_v3(p->b.abs, p->a.abs),
+			tin_sub_v3(p->c.abs, p->a.abs));
+		if (tin_dot_v3(r->dir, normal) < 0.0f) {
+			fprintf(stderr, "Portal faces the wrong direction! (it=%d)\n", it);
+		}
+
+		oc = tin_sub_v3(p->c.abs, r->origin);
 		tin_vec3 d_x_oc = tin_cross_v3(r->dir, oc);
 		
 		/* if <D , (OB x OC)> < 0 */
-		tin_vec3 ob = tin_sub_v3(p->b.abs, r->origin);
+		ob = tin_sub_v3(p->b.abs, r->origin);
 		if (-tin_dot_v3(ob, d_x_oc) < 0.0f) {
 			p->a = p->c; /* throw away A */
 			dir = tin_cross_v3(oc, ob);
@@ -194,7 +212,7 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 		}
 		
 		/* if <D , (OC x OA)> < 0 */
-		tin_vec3 oa = tin_sub_v3(p->a.abs, r->origin);
+		oa = tin_sub_v3(p->a.abs, r->origin);
 		if (tin_dot_v3(oa, d_x_oc) < 0.0f) {
 			p->b = p->c; /* throw away B */
 			dir = tin_cross_v3(oa, oc);
