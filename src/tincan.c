@@ -1,6 +1,7 @@
 #include "tincan.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 
 tin_vec3
@@ -128,66 +129,64 @@ tin_polytope_support(const tin_polytope *p, tin_vec3 dir)
 }
 
 void
-tin_polysum_support(const tin_polysum *p, tin_vec3 dir, tin_pspoint *sup)
+tin_polysum_support(const tin_polysum *s, tin_vec3 dir, tin_pspoint *sup)
 {
-	tin_vec3 former_dir = tin_apply_qt(tin_conjugate_qt(p->former_transform->rotation), dir);
-	sup->rel_former = tin_polytope_support(p->former_polytope, former_dir);
-	tin_vec3 former_abs = tin_apply_qt(p->former_transform->rotation, sup->rel_former);
-	former_abs = tin_add_v3(p->former_transform->translation, former_abs);
+	tin_vec3 former_dir = tin_apply_qt(tin_conjugate_qt(s->former_transform->rotation), dir);
+	sup->rel_former = tin_polytope_support(s->former_polytope, former_dir);
+	tin_vec3 former_abs = tin_apply_qt(s->former_transform->rotation, sup->rel_former);
+	former_abs = tin_add_v3(s->former_transform->translation, former_abs);
 
-	tin_vec3 latter_dir = tin_apply_qt(tin_conjugate_qt(p->latter_transform->rotation), tin_neg_v3(dir));
-	sup->rel_latter = tin_polytope_support(p->latter_polytope, latter_dir);
-	tin_vec3 latter_abs = tin_apply_qt(p->latter_transform->rotation, sup->rel_latter);
-	latter_abs = tin_add_v3(p->latter_transform->translation, latter_abs);
+	tin_vec3 latter_dir = tin_apply_qt(tin_conjugate_qt(s->latter_transform->rotation), tin_neg_v3(dir));
+	sup->rel_latter = tin_polytope_support(s->latter_polytope, latter_dir);
+	tin_vec3 latter_abs = tin_apply_qt(s->latter_transform->rotation, sup->rel_latter);
+	latter_abs = tin_add_v3(s->latter_transform->translation, latter_abs);
 
 	sup->abs = tin_sub_v3(former_abs, latter_abs);
 }
 
-#if 0
-
-static int
-construct_portal(const Minkowski *m, const Ray *r, Portal *p)
+int
+tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 {
 	tin_vec3 dir = r->dir;
-	minkowski_support(m, dir, &p->a);
+	tin_polysum_support(s, dir, &p->a);
 
-	tin_vec3 oa = tin_sub_v3(p->a.global, r->origin);
-	dir = gram_schmidt(oa, tin_make_v3(1.0f, 0.0f, 0.0f));
+	tin_vec3 oa = tin_sub_v3(p->a.abs, r->origin);
+	dir = tin_gram_schmidt(oa, (tin_vec3) {{ 1.0f, 0.0f, 0.0f }});
 	if (tin_dot_v3(dir, dir) == 0.0f) {
-		dir = tin_make_v3(0.0f, 0.0f, 1.0f);
+		dir = (tin_vec3) {{ 0.0f, 0.0f, 1.0f }};
 	}
-	minkowski_support(m, dir, &p->b);
+	tin_polysum_support(s, dir, &p->b);
 
-	dir = tin_cross_v3(tin_sub_v3(p->a.global, r->origin), tin_sub_v3(p->b.global, r->origin));
+	dir = tin_cross_v3(tin_sub_v3(p->a.abs, r->origin), tin_sub_v3(p->b.abs, r->origin));
 	if (tin_dot_v3(dir, r->dir) < 0.0f) {
 		dir = tin_scale_v3(-1.0f, dir);
 		/* preserve ccw winding */
-		SharedPoint temp = p->a;
+		tin_pspoint temp = p->a;
 		p->a = p->b;
 		p->b = temp;
 	}
 	
 	for (int it = 0;; it++) {
 		if (it >= 100) {
-			log_warn("MPR construct_portal() took too many iterations.");
+			fprintf(stderr, "MPR construct_portal() took too many iterations.");
 			return 0;
 		}
 
 		if (tin_dot_v3(dir, dir) == 0.0f) {
-			log_warn("Portal collapsed during construction. (it=%d)", it);
+			fprintf(stderr, "Portal collapsed during construction. (it=%d)", it);
 			return 0;
 		}
 
-		minkowski_support(m, dir, &p->c);
-		if (tin_dot_v3(dir, p->c.global) <= 0.0f) {
+		tin_polysum_support(s, dir, &p->c);
+		if (tin_dot_v3(dir, p->c.abs) <= 0.0f) {
 			return 0;
 		}
 		
-		tin_vec3 oc = tin_sub_v3(p->c.global, r->origin);
+		tin_vec3 oc = tin_sub_v3(p->c.abs, r->origin);
 		tin_vec3 d_x_oc = tin_cross_v3(r->dir, oc);
 		
 		/* if <D , (OB x OC)> < 0 */
-		tin_vec3 ob = tin_sub_v3(p->b.global, r->origin);
+		tin_vec3 ob = tin_sub_v3(p->b.abs, r->origin);
 		if (-tin_dot_v3(ob, d_x_oc) < 0.0f) {
 			p->a = p->c; /* throw away A */
 			dir = tin_cross_v3(oc, ob);
@@ -195,7 +194,7 @@ construct_portal(const Minkowski *m, const Ray *r, Portal *p)
 		}
 		
 		/* if <D , (OC x OA)> < 0 */
-		tin_vec3 oa = tin_sub_v3(p->a.global, r->origin);
+		tin_vec3 oa = tin_sub_v3(p->a.abs, r->origin);
 		if (tin_dot_v3(oa, d_x_oc) < 0.0f) {
 			p->b = p->c; /* throw away B */
 			dir = tin_cross_v3(oa, oc);
@@ -205,6 +204,8 @@ construct_portal(const Minkowski *m, const Ray *r, Portal *p)
 		return 1;
 	}
 }
+
+#if 0
 
 static int
 refine_portal(const Minkowski *m, const Ray *r, Portal *p)

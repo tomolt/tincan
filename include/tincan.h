@@ -79,7 +79,9 @@ typedef struct {
 	tin_vec3 rel_latter;
 } tin_pspoint;
 
-void tin_polysum_support(const tin_polysum *p, tin_vec3 dir, tin_pspoint *sup);
+void tin_polysum_support(const tin_polysum *s, tin_vec3 dir, tin_pspoint *sup);
+
+/* MPR */
 
 typedef struct {
 	tin_vec3 origin;
@@ -90,6 +92,8 @@ typedef struct {
 	tin_pspoint a, b, c;
 	tin_vec3    normal;
 } tin_portal;
+
+int tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p);
 
 #if 0
 
