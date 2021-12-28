@@ -22,8 +22,8 @@ static Camera camera;
 static Object objects[MAX_OBJECTS];
 static int    num_objects;
 
-static tin_convex cone_shape;
-static Model      cone_model;
+static tin_polytope cone_polytope;
+static Model        cone_model;
 
 static void
 init_cone(int tessel)
@@ -50,9 +50,8 @@ init_cone(int tessel)
 		indices[6*v+5] = tessel + 1;
 	}
 
-	cone_shape.type   = TIN_CONVEX;
-	cone_shape.verts  = verts;
-	cone_shape.nverts = nverts;
+	cone_polytope.vertices     = verts;
+	cone_polytope.num_vertices = nverts;
 
 	cone_model = render_make_model(nverts, verts, nindices, indices);
 	
@@ -144,15 +143,30 @@ main(void)
 
 	camera.quat = (tin_quat) { {{ 0.0f, 0.0f, 0.0f }}, 1.0f };
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
+	camera.position.c[2] = 5.0f;
 
 	objects[num_objects++] = (Object) {
 		{
 			{
 				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-				(tin_vec3) {{ 0.0f, 0.0f, -5.0f }},
+				(tin_vec3) {{ 0.0f, 0.0f, 0.0f }},
 				1.0f
 			},
-			(tin_shape *) &cone_shape
+			&cone_polytope,
+			TIN_CONVEX
+		},
+		&cone_model
+	};
+
+	objects[num_objects++] = (Object) {
+		{
+			{
+				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+				(tin_vec3) {{ 1.0f, 1.0f, 0.0f }},
+				1.0f
+			},
+			&cone_polytope,
+			TIN_CONVEX
 		},
 		&cone_model
 	};
