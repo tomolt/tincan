@@ -153,14 +153,14 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 	tin_polysum_support(s, dir, &p->a);
 	oa = tin_sub_v3(p->a.abs, r->origin);
 
-	dir = tin_sub_v3(r->dir, tin_normalize_v3(oa));
+	dir = tin_gram_schmidt(oa, r->dir);
 	if (tin_dot_v3(dir, dir) == 0.0f) {
 		dir = tin_gram_schmidt(oa, (tin_vec3) {{ 1.0f, 0.0f, 0.0f }});
-		dir = tin_normalize_v3(dir);
 		if (tin_dot_v3(dir, dir) == 0.0f) {
 			dir = (tin_vec3) {{ 0.0f, 0.0f, 1.0f }};
 		}
 	}
+	dir = tin_normalize_v3(dir);
 
 	tin_polysum_support(s, dir, &p->b);
 	ob = tin_sub_v3(p->b.abs, r->origin);
@@ -185,7 +185,6 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 		}
 
 		if (tin_dot_v3(dir, dir) == 0.0f) {
-			fprintf(stderr, "Portal collapsed during construction. (it=%d)\n", it);
 			return 0;
 		}
 
