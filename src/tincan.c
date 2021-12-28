@@ -193,13 +193,6 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 			return 0;
 		}
 		
-		tin_vec3 normal = tin_cross_v3(
-			tin_sub_v3(p->b.abs, p->a.abs),
-			tin_sub_v3(p->c.abs, p->a.abs));
-		if (tin_dot_v3(r->dir, normal) < 0.0f) {
-			fprintf(stderr, "Portal faces the wrong direction! (it=%d)\n", it);
-		}
-
 		oc = tin_sub_v3(p->c.abs, r->origin);
 		tin_vec3 d_x_oc = tin_cross_v3(r->dir, oc);
 		
