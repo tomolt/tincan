@@ -172,6 +172,28 @@ main(void)
 		&cone_model
 	};
 
+	tin_portal portal;
+	{
+		tin_polysum sum = {
+			objects[0].body.shape_params,
+			&objects[0].body.transform,
+			objects[1].body.shape_params,
+			&objects[1].body.transform,
+		};
+		tin_ray ray;
+		ray.origin = tin_sub_v3(
+				objects[0].body.transform.translation,
+				objects[1].body.transform.translation);
+		ray.dir = tin_normalize_v3(tin_neg_v3(ray.origin));
+
+		if (tin_construct_portal(&sum, &ray, &portal)) {
+			printf("Got portal\n");
+			tin_refine_portal(&sum, &ray, &portal);
+		} else {
+			printf("Got no portal\n");
+		}
+	}
+
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 		camera_update(&camera, 1.0f / 60.0f);
@@ -205,8 +227,8 @@ main(void)
 			sum.latter_transform = &ident;
 			tin_ray ray = { .origin = camtrf.translation, .dir = tin_apply_qt(camtrf.rotation, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }}) };
 			tin_vec3 color;
-			tin_portal portal;
-			if (tin_construct_portal(&sum, &ray, &portal)) {
+			tin_portal temp_portal;
+			if (tin_construct_portal(&sum, &ray, &temp_portal)) {
 				color = (tin_vec3) {{ 1.0f, 0.0f, 0.0f }};
 			} else {
 				color = (tin_vec3) {{ 1.0f, 1.0f, 1.0f }};
@@ -214,7 +236,24 @@ main(void)
 			render_draw_model(obj->model, &obj->body.transform, color);
 		}
 
+		tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
+		tin_transform trf = ident;
+		trf.scale = 0.1f;
+		trf.translation = portal.a.rel_former;
+		render_draw_model(&cone_model, &trf, color);
+		trf.translation = portal.b.rel_former;
+		render_draw_model(&cone_model, &trf, color);
+		trf.translation = portal.c.rel_former;
+		render_draw_model(&cone_model, &trf, color);
+		trf.translation = portal.a.rel_latter;
+		render_draw_model(&cone_model, &trf, color);
+		trf.translation = portal.b.rel_latter;
+		render_draw_model(&cone_model, &trf, color);
+		trf.translation = portal.c.rel_latter;
+		render_draw_model(&cone_model, &trf, color);
+
 		render_start_overlay();
+
 		render_proj_matrix = mat4_orthographic(width, height);
 		render_view_matrix = mat4_from_transform(&ident);
 
