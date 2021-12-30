@@ -172,25 +172,12 @@ main(void)
 		&cone_model
 	};
 
-	tin_portal portal;
+	tin_contact contact;
 	{
-		tin_polysum sum = {
-			objects[0].body.shape_params,
-			&objects[0].body.transform,
-			objects[1].body.shape_params,
-			&objects[1].body.transform,
-		};
-		tin_ray ray;
-		ray.origin = tin_sub_v3(
-				objects[0].body.transform.translation,
-				objects[1].body.transform.translation);
-		ray.dir = tin_normalize_v3(tin_neg_v3(ray.origin));
-
-		if (tin_construct_portal(&sum, &ray, &portal)) {
-			printf("Got portal\n");
-			tin_refine_portal(&sum, &ray, &portal);
+		if (tin_polytope_collide(objects[0].body.shape_params, &objects[0].body.transform, objects[1].body.shape_params, &objects[1].body.transform, &contact)) {
+			printf("Got a collision\n");
 		} else {
-			printf("Got no portal\n");
+			printf("Got no collision\n");
 		}
 	}
 
@@ -239,17 +226,9 @@ main(void)
 		tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
 		tin_transform trf = ident;
 		trf.scale = 0.1f;
-		trf.translation = tin_fwtrf_point(&objects[0].body.transform, portal.a.rel_former);
+		trf.translation = tin_fwtrf_point(&objects[0].body.transform, contact.rel_former);
 		render_draw_model(&cone_model, &trf, color);
-		trf.translation = tin_fwtrf_point(&objects[0].body.transform, portal.b.rel_former);
-		render_draw_model(&cone_model, &trf, color);
-		trf.translation = tin_fwtrf_point(&objects[0].body.transform, portal.c.rel_former);
-		render_draw_model(&cone_model, &trf, color);
-		trf.translation = tin_fwtrf_point(&objects[1].body.transform, portal.a.rel_latter);
-		render_draw_model(&cone_model, &trf, color);
-		trf.translation = tin_fwtrf_point(&objects[1].body.transform, portal.b.rel_latter);
-		render_draw_model(&cone_model, &trf, color);
-		trf.translation = tin_fwtrf_point(&objects[1].body.transform, portal.c.rel_latter);
+		trf.translation = tin_fwtrf_point(&objects[1].body.transform, contact.rel_latter);
 		render_draw_model(&cone_model, &trf, color);
 
 		render_start_overlay();
