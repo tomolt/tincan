@@ -101,18 +101,19 @@ typedef struct {
 int  tin_construct_portal(const tin_polysum *ps, const tin_ray *r, tin_portal *p);
 void tin_refine_portal   (const tin_polysum *ps, const tin_ray *r, tin_portal *p);
 
-#if 0
+/* Contact Points */
 
 typedef struct {
-	tin_vec3   former_rel;
-	tin_vec3   latter_rel;
+	tin_vec3   rel_former;
+	tin_vec3   rel_latter;
 	tin_vec3   normal;
 	tin_scalar depth;
 } tin_contact;
 
-void minkowski_support(const Body *b[2], tin_vec3 dir, SharedPoint *sup);
-int  mpr_intersect    (const Body *b[2], const Ray *ray, Contact *contact);
-
-#endif
+int tin_mpr_intersect(const tin_polysum *ps, const tin_ray *ray, tin_contact *contact);
+int tin_polytope_collide(
+	const tin_polytope *pa, const tin_transform *ta,
+	const tin_polytope *pb, const tin_transform *tb,
+	tin_contact *contact);
 
 #endif
