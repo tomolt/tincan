@@ -58,6 +58,10 @@ typedef struct {
 	tin_transform transform;
 	const void   *shape_params;
 	int           shape;
+	tin_scalar    inv_mass;
+	tin_vec3      inv_inertia;
+	tin_vec3      velocity;
+	tin_vec3      angular_velocity;
 } tin_body;
 
 /* Polytopes */
@@ -104,10 +108,15 @@ void tin_refine_portal   (const tin_polysum *ps, const tin_ray *r, tin_portal *p
 /* Contact Points */
 
 typedef struct {
-	tin_vec3   rel_former;
-	tin_vec3   rel_latter;
+	tin_vec3   rel1;
+	tin_vec3   rel2;
 	tin_vec3   normal;
-	tin_scalar depth;
+
+	tin_vec3   position;
+	tin_scalar separation;
+	
+	tin_scalar normal_mass;
+	tin_scalar bias;
 } tin_contact;
 
 int tin_mpr_intersect(const tin_polysum *ps, const tin_ray *ray, tin_contact *contact);
@@ -115,5 +124,12 @@ int tin_polytope_collide(
 	const tin_polytope *pa, const tin_transform *ta,
 	const tin_polytope *pb, const tin_transform *tb,
 	tin_contact *contact);
+
+typedef struct {
+	tin_body *body1;
+	tin_body *body2;
+	int num_contacts;
+	tin_contact contacts[4];
+} tin_arbiter;
 
 #endif

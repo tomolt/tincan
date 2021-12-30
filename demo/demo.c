@@ -226,9 +226,9 @@ main(void)
 		tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
 		tin_transform trf = ident;
 		trf.scale = 0.1f;
-		trf.translation = tin_fwtrf_point(&objects[0].body.transform, contact.rel_former);
+		trf.translation = tin_fwtrf_point(&objects[0].body.transform, contact.rel1);
 		render_draw_model(&cone_model, &trf, color);
-		trf.translation = tin_fwtrf_point(&objects[1].body.transform, contact.rel_latter);
+		trf.translation = tin_fwtrf_point(&objects[1].body.transform, contact.rel2);
 		render_draw_model(&cone_model, &trf, color);
 
 		render_start_overlay();
