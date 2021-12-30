@@ -149,11 +149,12 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 {
 	tin_vec3 oa, ob, oc;
 
-	tin_vec3 dir = r->dir;
-	tin_polysum_support(s, dir, &p->a);
+	/* find the very first point */
+	tin_polysum_support(s, r->dir, &p->a);
 	oa = tin_sub_v3(p->a.abs, r->origin);
 
-	dir = tin_gram_schmidt(oa, r->dir);
+	/* find the second point */
+	tin_vec3 dir = tin_gram_schmidt(oa, r->dir);
 	if (tin_dot_v3(dir, dir) == 0.0f) {
 		dir = tin_gram_schmidt(oa, (tin_vec3) {{ 1.0f, 0.0f, 0.0f }});
 		if (tin_dot_v3(dir, dir) == 0.0f) {
@@ -161,56 +162,42 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 		}
 	}
 	dir = tin_normalize_v3(dir);
-
 	tin_polysum_support(s, dir, &p->b);
 	ob = tin_sub_v3(p->b.abs, r->origin);
 
-	dir = tin_cross_v3(oa, ob);
-	if (tin_dot_v3(dir, dir) == 0.0f) {
-		return 0;
-	}
-	if (tin_dot_v3(dir, r->dir) < 0.0f) {
-		dir = tin_neg_v3(dir);
-		/* preserve ccw winding */
-		tin_pspoint temp = p->a;
-		p->a = p->b;
-		p->b = temp;
-	}
-	tin_scalar threshold = tin_dot_v3(dir, p->a.abs);
-	
 	for (int it = 0;; it++) {
 		if (it >= 100) {
 			fprintf(stderr, "Portal construction took too many iterations.\n");
 			return 0;
 		}
 
-		if (tin_dot_v3(dir, dir) == 0.0f) {
-			return 0;
+		/*  */
+		dir = tin_cross_v3(oa, ob);
+		if (tin_dot_v3(dir, r->dir) < 0.0f) {
+			dir = tin_neg_v3(dir);
 		}
-
 		tin_polysum_support(s, dir, &p->c);
-		if (tin_dot_v3(dir, p->c.abs) <= threshold) {
+		if (tin_dot_v3(dir, p->c.abs) <= tin_dot_v3(dir, p->a.abs)) {
 			return 0;
 		}
-		
+		if (tin_dot_v3(dir, p->c.abs) <= tin_dot_v3(dir, p->b.abs)) {
+			return 0;
+		}
 		oc = tin_sub_v3(p->c.abs, r->origin);
-		tin_vec3 d_x_oc = tin_cross_v3(r->dir, oc);
 		
-		/* if <D , (OB x OC)> < 0 */
-		ob = tin_sub_v3(p->b.abs, r->origin);
-		if (-tin_dot_v3(ob, d_x_oc) < 0.0f) {
-			dir = tin_cross_v3(oc, ob);
-			threshold = tin_dot_v3(dir, p->a.abs);
-			p->a = p->c; /* throw away A */
+		/*  */
+		tin_vec3 an = tin_cross_v3(ob, oc);
+		if (tin_dot_v3(an, oa) * tin_dot_v3(an, r->dir) < 0.0f) {
+			p->a = p->c;
+			oa = oc;
 			continue;
 		}
 		
-		/* if <D , (OC x OA)> < 0 */
-		oa = tin_sub_v3(p->a.abs, r->origin);
-		if (tin_dot_v3(oa, d_x_oc) < 0.0f) {
-			dir = tin_cross_v3(oa, oc);
-			threshold = tin_dot_v3(dir, p->b.abs);
-			p->b = p->c; /* throw away B */
+		/*  */
+		tin_vec3 bn = tin_cross_v3(oc, oa);
+		if (tin_dot_v3(bn, ob) * tin_dot_v3(bn, r->dir) < 0.0f) {
+			p->b = p->c;
+			ob = oc;
 			continue;
 		}
 		
