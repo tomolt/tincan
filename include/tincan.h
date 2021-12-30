@@ -93,7 +93,8 @@ typedef struct {
 	tin_vec3    normal;
 } tin_portal;
 
-int tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p);
+int  tin_construct_portal(const tin_polysum *ps, const tin_ray *r, tin_portal *p);
+void tin_refine_portal   (const tin_polysum *ps, const tin_ray *r, tin_portal *p);
 
 #if 0
 

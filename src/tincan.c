@@ -145,12 +145,12 @@ tin_polysum_support(const tin_polysum *s, tin_vec3 dir, tin_pspoint *sup)
 }
 
 int
-tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
+tin_construct_portal(const tin_polysum *ps, const tin_ray *r, tin_portal *p)
 {
 	tin_vec3 oa, ob, oc;
 
 	/* find the very first point */
-	tin_polysum_support(s, r->dir, &p->a);
+	tin_polysum_support(ps, r->dir, &p->a);
 	oa = tin_sub_v3(p->a.abs, r->origin);
 
 	/* find the second point */
@@ -162,7 +162,7 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 		}
 	}
 	dir = tin_normalize_v3(dir);
-	tin_polysum_support(s, dir, &p->b);
+	tin_polysum_support(ps, dir, &p->b);
 	ob = tin_sub_v3(p->b.abs, r->origin);
 
 	for (int it = 0;; it++) {
@@ -176,7 +176,7 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 		if (tin_dot_v3(dir, r->dir) < 0.0f) {
 			dir = tin_neg_v3(dir);
 		}
-		tin_polysum_support(s, dir, &p->c);
+		tin_polysum_support(ps, dir, &p->c);
 		if (tin_dot_v3(dir, p->c.abs) <= tin_dot_v3(dir, p->a.abs)) {
 			return 0;
 		}
@@ -205,42 +205,50 @@ tin_construct_portal(const tin_polysum *s, const tin_ray *r, tin_portal *p)
 	}
 }
 
-#if 0
-
-static int
-refine_portal(const Minkowski *m, const Ray *r, Portal *p)
+void
+tin_refine_portal(const tin_polysum *ps, const tin_ray *r, tin_portal *p)
 {
+	tin_vec3 ab = tin_sub_v3(p->b.abs, p->a.abs);
+	tin_vec3 ac = tin_sub_v3(p->c.abs, p->a.abs);
+	p->normal = tin_cross_v3(ab, ac);
+	if (tin_dot_v3(p->normal, r->dir) < 0.0f) {
+		tin_pspoint temp;
+		temp = p->a;
+		p->a = p->b;
+		p->b = temp;
+	}
+
 	for (int it = 0;; it++) {
-		tin_vec3 ab = tin_sub_v3(p->b.global, p->a.global);
-		tin_vec3 ac = tin_sub_v3(p->c.global, p->a.global);
+		tin_vec3 ab = tin_sub_v3(p->b.abs, p->a.abs);
+		tin_vec3 ac = tin_sub_v3(p->c.abs, p->a.abs);
 		p->normal = tin_cross_v3(ab, ac);
 
 		if (tin_dot_v3(p->normal, p->normal) == 0.0f) {
-			log_warn("portal collapsed. (it=%d)", it);
+			fprintf(stderr, "portal collapsed. (it=%d)\n", it);
 			break;
 		}
 
 		if (it >= 100) {
-			log_warn("MPR refine_portal() took too many iterations.");
+			fprintf(stderr, "MPR refine_portal() took too many iterations.\n");
 			break;
 		}
 
-		SharedPoint s;
-		minkowski_support(m, p->normal, &s);
+		tin_pspoint s;
+		tin_polysum_support(ps, p->normal, &s);
 		
-		tin_vec3 as = tin_sub_v3(s.global, p->a.global);
+		tin_vec3 as = tin_sub_v3(s.abs, p->a.abs);
 		if (tin_dot_v3(as, p->normal) < 0.001f * tin_dot_v3(p->normal, p->normal)) {
 			break;
 		}
 		
-		tin_vec3 os = tin_sub_v3(s.global, r->origin);
+		tin_vec3 os = tin_sub_v3(s.abs, r->origin);
 		tin_vec3 d_x_os = tin_cross_v3(r->dir, os);
 		
 		/* if <D , (OS x OA)> > 0 */
-		tin_vec3 oa = tin_sub_v3(p->a.global, r->origin);
+		tin_vec3 oa = tin_sub_v3(p->a.abs, r->origin);
 		if (tin_dot_v3(oa, d_x_os) > 0.0f) {
 			/* if <D , (OS x OB)> > 0 */
-			tin_vec3 ob = tin_sub_v3(p->b.global, r->origin);
+			tin_vec3 ob = tin_sub_v3(p->b.abs, r->origin);
 			if (tin_dot_v3(ob, d_x_os) > 0.0f) {
 				p->a = s; /* SBC */
 			} else {
@@ -248,7 +256,7 @@ refine_portal(const Minkowski *m, const Ray *r, Portal *p)
 			}
 		} else {
 			/* if <D , (OS x OC)> > 0 */
-			tin_vec3 oc = tin_sub_v3(p->c.global, r->origin);
+			tin_vec3 oc = tin_sub_v3(p->c.abs, r->origin);
 			if (tin_dot_v3(oc, d_x_os) > 0.0f) {
 				p->b = s; /* ASC */
 			} else {
@@ -256,13 +264,9 @@ refine_portal(const Minkowski *m, const Ray *r, Portal *p)
 			}
 		}
 	}
-
-	if (tin_dot_v3(p->normal, p->a.global) >= 0.0f) {
-		return 1;
-	} else {
-		return 0;
-	}
 }
+
+#if 0
 
 static void
 calculate_contact_point(const Minkowski *m, const Ray *r, const Portal *p, SharedPoint *point)
