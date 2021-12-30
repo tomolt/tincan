@@ -114,6 +114,36 @@ tin_prlgram_area(tin_vec3 e1, tin_vec3 e2)
 }
 
 tin_vec3
+tin_fwtrf_point(const tin_transform *transform, tin_vec3 vec)
+{
+	vec = tin_apply_qt(transform->rotation,    vec);
+	vec = tin_scale_v3(transform->scale,       vec);
+	vec = tin_add_v3  (transform->translation, vec);
+	return vec;
+}
+
+tin_vec3
+tin_fwtrf_dir(const tin_transform *transform, tin_vec3 vec)
+{
+	return tin_apply_qt(transform->rotation, vec);
+}
+
+tin_vec3
+tin_bwtrf_point(const tin_transform *transform, tin_vec3 vec)
+{
+	vec = tin_sub_v3  (vec, transform->translation);
+	vec = tin_scale_v3(1.0f / transform->scale, vec);
+	vec = tin_apply_qt(tin_conjugate_qt(transform->rotation), vec);
+	return vec;
+}
+
+tin_vec3
+tin_bwtrf_dir(const tin_transform *transform, tin_vec3 vec)
+{
+	return tin_apply_qt(tin_conjugate_qt(transform->rotation), vec);
+}
+
+tin_vec3
 tin_polytope_support(const tin_polytope *p, tin_vec3 dir)
 {
 	tin_scalar score, best_score = -INFINITY;
@@ -131,15 +161,13 @@ tin_polytope_support(const tin_polytope *p, tin_vec3 dir)
 void
 tin_polysum_support(const tin_polysum *s, tin_vec3 dir, tin_pspoint *sup)
 {
-	tin_vec3 former_dir = tin_apply_qt(tin_conjugate_qt(s->former_transform->rotation), dir);
+	tin_vec3 former_dir = tin_bwtrf_dir(s->former_transform, dir);
 	sup->rel_former = tin_polytope_support(s->former_polytope, former_dir);
-	tin_vec3 former_abs = tin_apply_qt(s->former_transform->rotation, sup->rel_former);
-	former_abs = tin_add_v3(s->former_transform->translation, former_abs);
+	tin_vec3 former_abs = tin_fwtrf_point(s->former_transform, sup->rel_former);
 
-	tin_vec3 latter_dir = tin_apply_qt(tin_conjugate_qt(s->latter_transform->rotation), tin_neg_v3(dir));
+	tin_vec3 latter_dir = tin_bwtrf_dir(s->latter_transform, tin_neg_v3(dir));
 	sup->rel_latter = tin_polytope_support(s->latter_polytope, latter_dir);
-	tin_vec3 latter_abs = tin_apply_qt(s->latter_transform->rotation, sup->rel_latter);
-	latter_abs = tin_add_v3(s->latter_transform->translation, latter_abs);
+	tin_vec3 latter_abs = tin_fwtrf_point(s->latter_transform, sup->rel_latter);
 
 	sup->abs = tin_sub_v3(former_abs, latter_abs);
 }

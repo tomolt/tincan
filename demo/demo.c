@@ -163,8 +163,8 @@ main(void)
 		{
 			{
 				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-				(tin_vec3) {{ 1.0f, 1.0f, 0.0f }},
-				1.0f
+				(tin_vec3) {{ 0.75f, 1.0f, 0.0f }},
+				0.75f
 			},
 			&cone_polytope,
 			TIN_CONVEX
@@ -239,17 +239,17 @@ main(void)
 		tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
 		tin_transform trf = ident;
 		trf.scale = 0.1f;
-		trf.translation = portal.a.rel_former;
+		trf.translation = tin_fwtrf_point(&objects[0].body.transform, portal.a.rel_former);
 		render_draw_model(&cone_model, &trf, color);
-		trf.translation = portal.b.rel_former;
+		trf.translation = tin_fwtrf_point(&objects[0].body.transform, portal.b.rel_former);
 		render_draw_model(&cone_model, &trf, color);
-		trf.translation = portal.c.rel_former;
+		trf.translation = tin_fwtrf_point(&objects[0].body.transform, portal.c.rel_former);
 		render_draw_model(&cone_model, &trf, color);
-		trf.translation = portal.a.rel_latter;
+		trf.translation = tin_fwtrf_point(&objects[1].body.transform, portal.a.rel_latter);
 		render_draw_model(&cone_model, &trf, color);
-		trf.translation = portal.b.rel_latter;
+		trf.translation = tin_fwtrf_point(&objects[1].body.transform, portal.b.rel_latter);
 		render_draw_model(&cone_model, &trf, color);
-		trf.translation = portal.c.rel_latter;
+		trf.translation = tin_fwtrf_point(&objects[1].body.transform, portal.c.rel_latter);
 		render_draw_model(&cone_model, &trf, color);
 
 		render_start_overlay();

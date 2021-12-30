@@ -42,6 +42,11 @@ typedef struct {
 	tin_scalar scale;
 } tin_transform;
 
+tin_vec3 tin_fwtrf_point(const tin_transform *transform, tin_vec3 vec);
+tin_vec3 tin_fwtrf_dir  (const tin_transform *transform, tin_vec3 vec);
+tin_vec3 tin_bwtrf_point(const tin_transform *transform, tin_vec3 vec);
+tin_vec3 tin_bwtrf_dir  (const tin_transform *transform, tin_vec3 vec);
+
 /* Shapes */
 
 #define TIN_SPHERE 's'
