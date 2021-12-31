@@ -28,7 +28,7 @@ static Model        cone_model;
 static tin_polytope cube_polytope;
 static Model        cube_model;
 
-static float time_multiplier = 1.0f / 4.0f;
+static float time_multiplier = 1.0f;
 
 static void
 init_cone(int tessel)
@@ -296,6 +296,10 @@ main(void)
 			tin_vec3 av = b->angular_velocity;
 			tin_scalar angle = sqrtf(tin_dot_v3(av, av));
 			b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
+
+			if (b->inv_mass != 0.0f) {
+				b->velocity = tin_saxpy_v3(dt, (tin_vec3) {{ 0.0f, -3.0f, 0.0f }}, b->velocity);
+			}
 		}
 
 		for (int o = 0; o < num_objects; o++) {
@@ -304,19 +308,21 @@ main(void)
 			dot.num_vertices = 1;
 			dot.vertices = malloc(1 * sizeof *dot.vertices);
 			dot.vertices[0] = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
+			tin_vec3 color = {{ 1.0f, 1.0f, 1.0f }};
+#if 0
 			tin_polysum sum;
 			sum.former_polytope = obj->body.shape_params;
 			sum.former_transform = &obj->body.transform;
 			sum.latter_polytope = &dot;
 			sum.latter_transform = &ident;
 			tin_ray ray = { .origin = camtrf.translation, .dir = tin_apply_qt(camtrf.rotation, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }}) };
-			tin_vec3 color;
 			tin_portal temp_portal;
 			if (tin_construct_portal(&sum, &ray, &temp_portal)) {
 				color = (tin_vec3) {{ 1.0f, 0.0f, 0.0f }};
 			} else {
 				color = (tin_vec3) {{ 1.0f, 1.0f, 1.0f }};
 			}
+#endif
 			render_draw_model(obj->model, &obj->body.transform, color);
 		}
 

@@ -404,8 +404,7 @@ void
 tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
 {
 	const tin_scalar allowed_penetration = 0.01f;
-	//const tin_scalar bias_factor = 0.2f;
-	const tin_scalar bias_factor = 0.0f;
+	const tin_scalar bias_factor = 0.2f;
 
 	tin_body *b1 = a->body1;
 	tin_body *b2 = a->body2;
@@ -427,7 +426,7 @@ tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
 			tin_cross_v3(tin_solve_inertia(b1, tin_cross_v3(r1, c->normal)), r1),
 			tin_cross_v3(tin_solve_inertia(b2, tin_cross_v3(r2, c->normal)), r2)));
 
-		c->bias = -bias_factor / inv_dt * MIN(0.0f, c->separation + allowed_penetration);
+		c->bias = -bias_factor * inv_dt * MIN(0.0f, c->separation + allowed_penetration);
 	}
 }
 
