@@ -132,4 +132,7 @@ typedef struct {
 	tin_contact contacts[4];
 } tin_arbiter;
 
+void tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt);
+void tin_arbiter_apply_impulse(tin_arbiter *a);
+
 #endif

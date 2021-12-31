@@ -26,6 +26,8 @@ static int    num_objects;
 static tin_polytope cone_polytope;
 static Model        cone_model;
 
+static float time_multiplier = 1.0f;
+
 static void
 init_cone(int tessel)
 {
@@ -88,6 +90,13 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 			}
 		}
+		break;
+	
+	case GLFW_KEY_KP_ADD:
+		time_multiplier *= 2.0f;
+		break;
+	case GLFW_KEY_KP_SUBTRACT:
+		time_multiplier /= 2.0f;
 		break;
 	}
 }
@@ -156,7 +165,8 @@ main(void)
 			&cone_polytope,
 			TIN_CONVEX,
 			1.0f / 5.0f,
-			{{ 0.0f, 0.0f, 0.0f }}, /* TODO determine inertia! */
+			{{ 3.0f / 16.0f / 5.0f, 3.0f / 16.0f / 5.0f, 3.0f / 16.0f / 5.0f }}, /* TODO determine actual inertia! */
+			//{{ 0.0f, 0.0f, -0.5f }},
 			{{ 0.0f, 0.0f, 0.0f }},
 			{{ 0.0f, 0.0f, 0.0f }},
 		},
@@ -167,31 +177,46 @@ main(void)
 		{
 			{
 				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-				(tin_vec3) {{ 0.75f, 1.0f, 0.0f }},
+				(tin_vec3) {{ 0.8f, 0.9f, 0.0f }},
 				0.75f
 			},
 			&cone_polytope,
 			TIN_CONVEX,
 			1.0f / 3.0f,
-			{{ 0.0f, 0.0f, 0.0f }}, /* TODO determine inertia! */
+			{{ 3.0f / 16.0f / 3.0f, 3.0f / 16.0f / 3.0f, 3.0f / 16.0f / 3.0f }}, /* TODO determine actual inertia! */
 			{{ 0.0f, 0.0f, 0.0f }},
 			{{ 0.0f, 0.0f, 0.0f }},
+			//{{ 0.1f, 0.1f, 0.0f }},
 		},
 		&cone_model
 	};
 
-	tin_contact contact;
-	{
-		if (tin_polytope_collide(objects[0].body.shape_params, &objects[0].body.transform, objects[1].body.shape_params, &objects[1].body.transform, &contact)) {
-			printf("Got a collision\n");
-		} else {
-			printf("Got no collision\n");
-		}
-	}
-
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-		camera_update(&camera, 1.0f / 60.0f);
+		tin_scalar inv_dt = 1.0 / 60.0f * time_multiplier;
+
+		camera_update(&camera, inv_dt);
+
+		tin_contact contact;
+		int colliding = tin_polytope_collide(objects[0].body.shape_params, &objects[0].body.transform, objects[1].body.shape_params, &objects[1].body.transform, &contact);
+		if (colliding) {
+			tin_arbiter arbiter;
+			arbiter.body1 = &objects[0].body;
+			arbiter.body2 = &objects[1].body;
+			arbiter.num_contacts = 1;
+			arbiter.contacts[0] = contact;
+			tin_arbiter_prestep(&arbiter, inv_dt);
+			printf("%f; %f\n", arbiter.contacts[0].separation, arbiter.contacts[0].bias);
+			tin_arbiter_apply_impulse(&arbiter);
+		}
+
+		for (int o = 0; o < num_objects; o++) {
+			tin_body *b = &objects[o].body;
+			b->transform.translation = tin_saxpy_v3(inv_dt, b->velocity, b->transform.translation);
+			tin_vec3 av = b->angular_velocity;
+			tin_scalar angle = sqrtf(tin_dot_v3(av, av));
+			b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * inv_dt), b->transform.rotation);
+		}
 
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
@@ -231,13 +256,15 @@ main(void)
 			render_draw_model(obj->model, &obj->body.transform, color);
 		}
 
-		tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
-		tin_transform trf = ident;
-		trf.scale = 0.1f;
-		trf.translation = tin_fwtrf_point(&objects[0].body.transform, contact.rel1);
-		render_draw_model(&cone_model, &trf, color);
-		trf.translation = tin_fwtrf_point(&objects[1].body.transform, contact.rel2);
-		render_draw_model(&cone_model, &trf, color);
+		if (colliding) {
+			tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
+			tin_transform trf = ident;
+			trf.scale = 0.1f;
+			trf.translation = tin_fwtrf_point(&objects[0].body.transform, contact.rel1);
+			render_draw_model(&cone_model, &trf, color);
+			trf.translation = tin_fwtrf_point(&objects[1].body.transform, contact.rel2);
+			render_draw_model(&cone_model, &trf, color);
+		}
 
 		render_start_overlay();
 
