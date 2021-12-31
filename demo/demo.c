@@ -22,6 +22,7 @@ typedef struct {
 static Camera camera;
 static Object objects[MAX_OBJECTS];
 static int    num_objects;
+static tin_arbiter arbiters[MAX_OBJECTS * MAX_OBJECTS];
 
 static tin_polytope cone_polytope;
 static Model        cone_model;
@@ -262,29 +263,30 @@ main(void)
 
 		for (int a = 0; a < num_objects; a++) {
 			for (int b = a + 1; b < num_objects; b++) {
+				tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
+				arbiter->body1 = &objects[a].body;
+				arbiter->body2 = &objects[b].body;
+				tin_arbiter_update(arbiter);
+
 				tin_contact contact;
 				int colliding = tin_polytope_collide(
 					objects[a].body.shape_params, &objects[a].body.transform,
 					objects[b].body.shape_params, &objects[b].body.transform, &contact);
 				if (colliding) {
 					printf("D %f\n", tin_dot_v3(contact.normal, tin_sub_v3(objects[b].body.transform.translation, objects[a].body.transform.translation)));
-					tin_arbiter arbiter;
-					arbiter.body1 = &objects[a].body;
-					arbiter.body2 = &objects[b].body;
-					arbiter.num_contacts = 1;
-					arbiter.contacts[0] = contact;
-					tin_arbiter_prestep(&arbiter, inv_dt);
-					printf("%f; %f\n", arbiter.contacts[0].separation, arbiter.contacts[0].bias);
-					tin_arbiter_apply_impulse(&arbiter);
+					tin_arbiter_add_contact(arbiter, contact);
+					tin_arbiter_prestep(arbiter, inv_dt);
+					tin_arbiter_apply_impulse(arbiter);
 				}
 
-				if (colliding) {
+				for (int i = 0; i < arbiter->num_contacts; i++) {
+					const tin_contact *c = &arbiter->contacts[i];
 					tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
 					tin_transform trf = ident;
 					trf.scale = 0.1f;
-					trf.translation = tin_fwtrf_point(&objects[a].body.transform, contact.rel1);
+					trf.translation = tin_fwtrf_point(&objects[a].body.transform, c->rel1);
 					render_draw_model(&cone_model, &trf, color);
-					trf.translation = tin_fwtrf_point(&objects[b].body.transform, contact.rel2);
+					trf.translation = tin_fwtrf_point(&objects[b].body.transform, c->rel2);
 					render_draw_model(&cube_model, &trf, color);
 				}
 			}

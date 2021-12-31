@@ -400,11 +400,83 @@ tin_solve_inertia(const tin_body *b, tin_vec3 vec)
 	return vec;
 }
 
+static tin_scalar
+tin_distsq_v3(tin_vec3 a, tin_vec3 b)
+{
+	tin_vec3 d = tin_sub_v3(a, b);
+	return tin_dot_v3(d, d);
+}
+
+void
+tin_arbiter_update(tin_arbiter *a)
+{
+	const tin_scalar max_separation = 0.1f;
+
+	tin_body *b1 = a->body1;
+	tin_body *b2 = a->body2;
+
+	for (int i = 0; i < a->num_contacts; i++) {
+		tin_contact *c = &a->contacts[i];
+
+		tin_vec3 p1 = tin_fwtrf_point(&b1->transform, c->rel1);
+		tin_vec3 p2 = tin_fwtrf_point(&b2->transform, c->rel2);
+
+		tin_scalar separation = tin_dot_v3(c->normal, tin_sub_v3(p2, p1));
+
+		if (separation > max_separation) {
+			*c = a->contacts[--a->num_contacts];
+			i--;
+			continue;
+		}
+
+		tin_scalar stretch = tin_distsq_v3(p1, p2);
+		if (stretch > c->base_stretch * (2.0f * 2.0f)) {
+			*c = a->contacts[--a->num_contacts];
+			i--;
+			continue;
+		}
+	}
+
+}
+
+void
+tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact)
+{
+	tin_body *b1 = a->body1;
+	tin_body *b2 = a->body2;
+
+	tin_vec3 p1, p2;
+	p1 = tin_fwtrf_point(&b1->transform, contact.rel1);
+	p2 = tin_fwtrf_point(&b2->transform, contact.rel2);
+	contact.base_stretch = tin_distsq_v3(p1, p2);
+
+	if (a->num_contacts < 4) {
+		a->contacts[a->num_contacts++] = contact;
+		return;
+	}
+
+	tin_vec3 new_pos = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
+	int best_i = -1;
+	tin_scalar best_dist = INFINITY;
+	for (int i = 0; i < a->num_contacts; i++) {
+		tin_contact *c = &a->contacts[i];
+		p1 = tin_fwtrf_point(&b1->transform, c->rel1);
+		p2 = tin_fwtrf_point(&b2->transform, c->rel2);
+		tin_vec3 old_pos = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
+		tin_scalar dist = tin_distsq_v3(old_pos, new_pos);
+		if (dist < best_dist) {
+			best_i = i;
+			best_dist = dist;
+		}
+	}
+	a->contacts[best_i] = contact;
+}
+
 void
 tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
 {
 	const tin_scalar allowed_penetration = 0.01f;
-	const tin_scalar bias_factor = 0.2f;
+	const tin_scalar bias_factor = 0.05f;
 
 	tin_body *b1 = a->body1;
 	tin_body *b2 = a->body2;

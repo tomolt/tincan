@@ -112,6 +112,7 @@ typedef struct {
 	tin_vec3   rel1;
 	tin_vec3   rel2;
 	tin_vec3   normal;
+	tin_scalar base_stretch;
 
 	tin_vec3   position;
 	tin_scalar separation;
@@ -132,6 +133,8 @@ typedef struct {
 	tin_contact contacts[4];
 } tin_arbiter;
 
+void tin_arbiter_update(tin_arbiter *a);
+void tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact);
 void tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt);
 void tin_arbiter_apply_impulse(tin_arbiter *a);
 
