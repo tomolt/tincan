@@ -26,7 +26,7 @@ static int    num_objects;
 static tin_polytope cone_polytope;
 static Model        cone_model;
 
-static float time_multiplier = 1.0f;
+static float time_multiplier = 1.0f / 4.0f;
 
 static void
 init_cone(int tessel)
@@ -164,8 +164,8 @@ main(void)
 			},
 			&cone_polytope,
 			TIN_CONVEX,
-			1.0f / 5.0f,
-			{{ 3.0f / 16.0f / 5.0f, 3.0f / 16.0f / 5.0f, 3.0f / 16.0f / 5.0f }}, /* TODO determine actual inertia! */
+			1.0f / 1.0f,
+			{{ 3.0f / 16.0f / 1.0f, 3.0f / 16.0f / 1.0f, 3.0f / 16.0f / 1.0f }}, /* TODO determine actual inertia! */
 			//{{ 0.0f, 0.0f, -0.5f }},
 			{{ 0.0f, 0.0f, 0.0f }},
 			{{ 0.0f, 0.0f, 0.0f }},
@@ -177,14 +177,14 @@ main(void)
 		{
 			{
 				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-				(tin_vec3) {{ 0.8f, 0.9f, 0.0f }},
+				(tin_vec3) {{ 4.0f, 0.9f, -0.3f }},
 				0.75f
 			},
 			&cone_polytope,
 			TIN_CONVEX,
 			1.0f / 3.0f,
 			{{ 3.0f / 16.0f / 3.0f, 3.0f / 16.0f / 3.0f, 3.0f / 16.0f / 3.0f }}, /* TODO determine actual inertia! */
-			{{ 0.0f, 0.0f, 0.0f }},
+			{{ -0.5f, 0.0f, 0.0f }},
 			{{ 0.0f, 0.0f, 0.0f }},
 			//{{ 0.1f, 0.1f, 0.0f }},
 		},
@@ -193,13 +193,15 @@ main(void)
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-		tin_scalar inv_dt = 1.0 / 60.0f * time_multiplier;
+		tin_scalar dt = 1.0f / 60.0f * time_multiplier;
+		tin_scalar inv_dt = 1.0f / dt;
 
-		camera_update(&camera, inv_dt);
+		camera_update(&camera, 1.0f / 60.0f);
 
 		tin_contact contact;
 		int colliding = tin_polytope_collide(objects[0].body.shape_params, &objects[0].body.transform, objects[1].body.shape_params, &objects[1].body.transform, &contact);
 		if (colliding) {
+			printf("D %f\n", tin_dot_v3(contact.normal, tin_sub_v3(objects[1].body.transform.translation, objects[0].body.transform.translation)));
 			tin_arbiter arbiter;
 			arbiter.body1 = &objects[0].body;
 			arbiter.body2 = &objects[1].body;
@@ -212,10 +214,10 @@ main(void)
 
 		for (int o = 0; o < num_objects; o++) {
 			tin_body *b = &objects[o].body;
-			b->transform.translation = tin_saxpy_v3(inv_dt, b->velocity, b->transform.translation);
+			b->transform.translation = tin_saxpy_v3(dt, b->velocity, b->transform.translation);
 			tin_vec3 av = b->angular_velocity;
 			tin_scalar angle = sqrtf(tin_dot_v3(av, av));
-			b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * inv_dt), b->transform.rotation);
+			b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
 		}
 
 		int width, height;

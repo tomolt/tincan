@@ -404,7 +404,8 @@ void
 tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
 {
 	const tin_scalar allowed_penetration = 0.01f;
-	const tin_scalar bias_factor = 0.2f;
+	//const tin_scalar bias_factor = 0.2f;
+	const tin_scalar bias_factor = 0.0f;
 
 	tin_body *b1 = a->body1;
 	tin_body *b2 = a->body2;
@@ -426,7 +427,7 @@ tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
 			tin_cross_v3(tin_solve_inertia(b1, tin_cross_v3(r1, c->normal)), r1),
 			tin_cross_v3(tin_solve_inertia(b2, tin_cross_v3(r2, c->normal)), r2)));
 
-		c->bias = -bias_factor * inv_dt * MIN(0.0f, c->separation + allowed_penetration);
+		c->bias = -bias_factor / inv_dt * MIN(0.0f, c->separation + allowed_penetration);
 	}
 }
 
@@ -449,6 +450,8 @@ tin_arbiter_apply_impulse(tin_arbiter *a)
 
 		/* Compute normal impulse */
 		tin_scalar magnitude = c->normal_mass * (-tin_dot_v3(v_rel, c->normal) + c->bias);
+		printf("normal_mass = %f\n", c->normal_mass);
+		printf("magnitude = %f\n", magnitude);
 		magnitude = MAX(magnitude, 0.0f);
 		tin_vec3 impulse = tin_scale_v3(magnitude, c->normal);
 
