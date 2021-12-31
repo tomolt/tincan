@@ -25,6 +25,8 @@ static int    num_objects;
 
 static tin_polytope cone_polytope;
 static Model        cone_model;
+static tin_polytope cube_polytope;
+static Model        cube_model;
 
 static float time_multiplier = 1.0f / 4.0f;
 
@@ -59,6 +61,32 @@ init_cone(int tessel)
 	cone_model = render_make_model(nverts, verts, nindices, indices);
 	
 	free(indices);
+}
+
+static void
+init_cube(void)
+{
+	static tin_vec3 verts[] = {
+		{{ -1, -1, -1 }},
+		{{  1, -1, -1 }},
+		{{ -1,  1, -1 }},
+		{{  1,  1, -1 }},
+		{{ -1, -1,  1 }},
+		{{  1, -1,  1 }},
+		{{ -1,  1,  1 }},
+		{{  1,  1,  1 }},
+	};
+	static GLushort indices[] = {
+		0, 1, 2, 1, 2, 3,
+		4, 5, 6, 5, 6, 7,
+		0, 1, 4, 1, 4, 5,
+		2, 3, 6, 3, 6, 7,
+		0, 2, 4, 2, 4, 6,
+		1, 3, 5, 3, 5, 7,
+	};
+	cube_polytope.vertices = verts;
+	cube_polytope.num_vertices = 8;
+	cube_model = render_make_model(8, verts, 6 * 6, indices);
 }
 
 static void
@@ -150,6 +178,7 @@ main(void)
 	glEnable(GL_DEPTH_TEST);
 	render_init();
 	init_cone(16);
+	init_cube();
 
 	camera.quat = (tin_quat) { {{ 0.0f, 0.0f, 0.0f }}, 1.0f };
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
@@ -180,7 +209,7 @@ main(void)
 				(tin_vec3) {{ 4.0f, 0.9f, -0.3f }},
 				0.75f
 			},
-			&cone_polytope,
+			&cube_polytope,
 			TIN_CONVEX,
 			1.0f / 3.0f,
 			{{ 3.0f / 16.0f / 3.0f, 3.0f / 16.0f / 3.0f, 3.0f / 16.0f / 3.0f }}, /* TODO determine actual inertia! */
@@ -188,7 +217,7 @@ main(void)
 			{{ 0.0f, 0.0f, 0.0f }},
 			//{{ 0.1f, 0.1f, 0.0f }},
 		},
-		&cone_model
+		&cube_model
 	};
 
 	while (!glfwWindowShouldClose(window)) {
