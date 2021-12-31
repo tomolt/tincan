@@ -267,7 +267,12 @@ main(void)
 				arbiter->body1 = &objects[a].body;
 				arbiter->body2 = &objects[b].body;
 				tin_arbiter_update(arbiter);
+			}
+		}
 
+		for (int a = 0; a < num_objects; a++) {
+			for (int b = a + 1; b < num_objects; b++) {
+				tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
 				tin_contact contact;
 				int colliding = tin_polytope_collide(
 					objects[a].body.shape_params, &objects[a].body.transform,
@@ -275,10 +280,13 @@ main(void)
 				if (colliding) {
 					printf("D %f\n", tin_dot_v3(contact.normal, tin_sub_v3(objects[b].body.transform.translation, objects[a].body.transform.translation)));
 					tin_arbiter_add_contact(arbiter, contact);
-					tin_arbiter_prestep(arbiter, inv_dt);
-					tin_arbiter_apply_impulse(arbiter);
 				}
+			}
+		}
 
+		for (int a = 0; a < num_objects; a++) {
+			for (int b = a + 1; b < num_objects; b++) {
+				tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
 				for (int i = 0; i < arbiter->num_contacts; i++) {
 					const tin_contact *c = &arbiter->contacts[i];
 					tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
@@ -288,6 +296,22 @@ main(void)
 					render_draw_model(&cone_model, &trf, color);
 					trf.translation = tin_fwtrf_point(&objects[b].body.transform, c->rel2);
 					render_draw_model(&cube_model, &trf, color);
+				}
+			}
+		}
+
+		for (int a = 0; a < num_objects; a++) {
+			for (int b = a + 1; b < num_objects; b++) {
+				tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
+				tin_arbiter_prestep(arbiter, inv_dt);
+			}
+		}
+
+		for (int it = 0; it < 4; it++) {
+			for (int a = 0; a < num_objects; a++) {
+				for (int b = a + 1; b < num_objects; b++) {
+					tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
+					tin_arbiter_apply_impulse(arbiter);
 				}
 			}
 		}
