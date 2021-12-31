@@ -64,6 +64,12 @@ tin_normalize_v3(tin_vec3 v)
 	}
 }
 
+tin_vec3
+tin_hadamard_v3(tin_vec3 a, tin_vec3 b)
+{
+	return (tin_vec3) {{ a.c[0]*b.c[0], a.c[1]*b.c[1], a.c[2]*b.c[2] }};
+}
+
 tin_quat
 tin_make_qt(tin_vec3 axis, tin_scalar angle)
 {
@@ -178,23 +184,22 @@ tin_polysum_support(const tin_polysum *s, tin_vec3 dir, tin_pspoint *sup)
 int
 tin_construct_portal(const tin_polysum *ps, const tin_ray *r, tin_portal *p)
 {
-	tin_vec3 oa, ob, oc;
-
 	/* find the very first point */
 	tin_polysum_support(ps, r->dir, &p->a);
-	oa = tin_sub_v3(p->a.abs, r->origin);
 
 	/* find the second point */
-	tin_vec3 dir = tin_gram_schmidt(oa, r->dir);
-	if (tin_dot_v3(dir, dir) == 0.0f) {
-		dir = tin_gram_schmidt(oa, (tin_vec3) {{ 1.0f, 0.0f, 0.0f }});
+	{
+		tin_vec3 oa = tin_sub_v3(p->a.abs, r->origin);
+		tin_vec3 dir = tin_gram_schmidt(oa, r->dir);
 		if (tin_dot_v3(dir, dir) == 0.0f) {
-			dir = (tin_vec3) {{ 0.0f, 0.0f, 1.0f }};
+			dir = tin_gram_schmidt(oa, (tin_vec3) {{ 1.0f, 0.0f, 0.0f }});
+			if (tin_dot_v3(dir, dir) == 0.0f) {
+				dir = (tin_vec3) {{ 0.0f, 0.0f, 1.0f }};
+			}
 		}
+		dir = tin_normalize_v3(dir);
+		tin_polysum_support(ps, dir, &p->b);
 	}
-	dir = tin_normalize_v3(dir);
-	tin_polysum_support(ps, dir, &p->b);
-	ob = tin_sub_v3(p->b.abs, r->origin);
 
 	for (int it = 0;; it++) {
 		if (it >= 100) {
@@ -203,24 +208,23 @@ tin_construct_portal(const tin_polysum *ps, const tin_ray *r, tin_portal *p)
 		}
 
 		/*  */
-		dir = tin_cross_v3(oa, ob);
+		tin_vec3 oa = tin_sub_v3(p->a.abs, r->origin);
+		tin_vec3 ob = tin_sub_v3(p->b.abs, r->origin);
+		tin_vec3 dir = tin_cross_v3(oa, ob);
 		if (tin_dot_v3(dir, r->dir) < 0.0f) {
 			dir = tin_neg_v3(dir);
 		}
 		tin_polysum_support(ps, dir, &p->c);
-		if (tin_dot_v3(dir, p->c.abs) <= tin_dot_v3(dir, p->a.abs)) {
+		tin_scalar score = tin_dot_v3(dir, p->c.abs);
+		if (score <= tin_dot_v3(dir, p->a.abs) || score <= tin_dot_v3(dir, p->b.abs)) {
 			return 0;
 		}
-		if (tin_dot_v3(dir, p->c.abs) <= tin_dot_v3(dir, p->b.abs)) {
-			return 0;
-		}
-		oc = tin_sub_v3(p->c.abs, r->origin);
+		tin_vec3 oc = tin_sub_v3(p->c.abs, r->origin);
 		
 		/*  */
 		tin_vec3 an = tin_cross_v3(ob, oc);
 		if (tin_dot_v3(an, oa) * tin_dot_v3(an, r->dir) < 0.0f) {
 			p->a = p->c;
-			oa = oc;
 			continue;
 		}
 		
@@ -228,7 +232,6 @@ tin_construct_portal(const tin_polysum *ps, const tin_ray *r, tin_portal *p)
 		tin_vec3 bn = tin_cross_v3(oc, oa);
 		if (tin_dot_v3(bn, ob) * tin_dot_v3(bn, r->dir) < 0.0f) {
 			p->b = p->c;
-			ob = oc;
 			continue;
 		}
 		
@@ -298,19 +301,23 @@ tin_refine_portal(const tin_polysum *ps, const tin_ray *r, tin_portal *p)
 }
 
 void
-tin_calculate_contact_point(const tin_ray *r, const tin_portal *p, tin_pspoint *point)
+tin_calculate_contact(const tin_ray *r, const tin_portal *p, tin_contact *contact)
 {
+	contact->normal = tin_normalize_v3(p->normal);
+
 	tin_vec3 ab = tin_sub_v3(p->b.abs, p->a.abs);
 	tin_vec3 ac = tin_sub_v3(p->c.abs, p->a.abs);
 	tin_scalar area_total = tin_prlgram_area(ab, ac);
 	if (area_total == 0.0f) {
-		*point = p->a;
+		contact->rel1 = p->a.rel_former;
+		contact->rel2 = p->a.rel_latter;
 		fprintf(stderr, "Calculating contact point on collapsed portal.\n");
 		return;
 	}
 	tin_scalar proj = tin_dot_v3(p->normal, r->dir);
 	if (proj == 0.0f) {
-		*point = p->a;
+		contact->rel1 = p->a.rel_former;
+		contact->rel2 = p->a.rel_latter;
 		fprintf(stderr, "Portal and contact normal have become parallel.\n");
 		return;
 	}
@@ -323,30 +330,38 @@ tin_calculate_contact_point(const tin_ray *r, const tin_portal *p, tin_pspoint *
 	tin_scalar gamma = area_c / area_total;
 	tin_scalar alpha = 1.0f - beta - gamma;
 	
-	if (alpha < 0.0f || alpha > 1.0001f
-	||  beta  < 0.0f || beta  > 1.0001f
-	||  gamma < 0.0f || gamma > 1.0001f) {
-		fprintf(stderr, "Barycentric coordinates lie outside of portal. (a=%f,b=%f,c=%f)\n", alpha, beta, gamma);
-	}
-	
-	point->rel_former = tin_scale_v3(alpha, p->a.rel_former);
-	point->rel_former = tin_saxpy_v3(beta,  p->b.rel_former, point->rel_former);
-	point->rel_former = tin_saxpy_v3(gamma, p->c.rel_former, point->rel_former);
+	contact->rel1 = tin_scale_v3(alpha, p->a.rel_former);
+	contact->rel1 = tin_saxpy_v3(beta,  p->b.rel_former, contact->rel1);
+	contact->rel1 = tin_saxpy_v3(gamma, p->c.rel_former, contact->rel1);
 
-	point->rel_latter = tin_scale_v3(alpha, p->a.rel_latter);
-	point->rel_latter = tin_saxpy_v3(beta,  p->b.rel_latter, point->rel_latter);
-	point->rel_latter = tin_saxpy_v3(gamma, p->c.rel_latter, point->rel_latter);
+	contact->rel2 = tin_scale_v3(alpha, p->a.rel_latter);
+	contact->rel2 = tin_saxpy_v3(beta,  p->b.rel_latter, contact->rel2);
+	contact->rel2 = tin_saxpy_v3(gamma, p->c.rel_latter, contact->rel2);
 }
 
 int
-tin_mpr_intersect(const tin_polysum *ps, const tin_ray *ray, tin_contact *contact)
+tin_polytope_collide(
+	const tin_polytope *pa, const tin_transform *ta,
+	const tin_polytope *pb, const tin_transform *tb,
+	tin_contact *contact)
 {
+	tin_polysum ps = { pa, ta, pb, tb };
+
+	tin_ray r;
+	r.origin = tin_sub_v3(ta->translation, tb->translation);
+	r.dir    = tin_neg_v3(r.origin);
+	tin_scalar norm = sqrtf(tin_dot_v3(r.dir, r.dir));
+	if (norm == 0.0f) {
+		/* FIXME */
+		return 1;
+	}
+	r.dir = tin_normalize_v3(r.dir);
+
 	tin_portal p;
-	tin_ray r = *ray;
-	if (!tin_construct_portal(ps, &r, &p)) {
+	if (!tin_construct_portal(&ps, &r, &p)) {
 		return 0;
 	}
-	tin_refine_portal(ps, &r, &p);
+	tin_refine_portal(&ps, &r, &p);
 	if (tin_dot_v3(p.normal, p.a.abs) < 0.0f) {
 		return 0;
 	}
@@ -357,10 +372,10 @@ tin_mpr_intersect(const tin_polysum *ps, const tin_ray *ray, tin_contact *contac
 		nr.dir    = p.normal;
 		nr.origin = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
 		tin_portal np;
-		if (!tin_construct_portal(ps, &nr, &np)) {
+		if (!tin_construct_portal(&ps, &nr, &np)) {
 			break;
 		}
-		tin_refine_portal(ps, &nr, &np);
+		tin_refine_portal(&ps, &nr, &np);
 		if (tin_dot_v3(np.normal, np.a.abs) < 0.0f) {
 			return 0;
 		}
@@ -372,39 +387,8 @@ tin_mpr_intersect(const tin_polysum *ps, const tin_ray *ray, tin_contact *contac
 		if (proj >= 0.99f) break;
 	}
 
-	tin_pspoint point;
-	tin_calculate_contact_point(&r, &p, &point);
-	contact->normal = p.normal;
-	contact->rel1 = point.rel_former;
-	contact->rel2 = point.rel_latter;
+	tin_calculate_contact(&r, &p, contact);
 	return 1;
-}
-
-int
-tin_polytope_collide(
-	const tin_polytope *pa, const tin_transform *ta,
-	const tin_polytope *pb, const tin_transform *tb,
-	tin_contact *contact)
-{
-	tin_polysum ps = { pa, ta, pb, tb };
-
-	tin_ray ray;
-	ray.origin = tin_sub_v3(ta->translation, tb->translation);
-	ray.dir    = tin_neg_v3(ray.origin);
-	tin_scalar norm = sqrtf(tin_dot_v3(ray.dir, ray.dir));
-	if (norm == 0.0f) {
-		/* FIXME */
-		return 1;
-	}
-	ray.dir = tin_normalize_v3(ray.dir);
-
-	return tin_mpr_intersect(&ps, &ray, contact);
-}
-
-static tin_vec3
-tin_hadamard_v3(tin_vec3 a, tin_vec3 b)
-{
-	return (tin_vec3) {{ a.c[0]*b.c[0], a.c[1]*b.c[1], a.c[2]*b.c[2] }};
 }
 
 static tin_vec3

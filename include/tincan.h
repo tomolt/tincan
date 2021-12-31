@@ -18,6 +18,7 @@ tin_vec3 tin_saxpy_v3(tin_scalar a, tin_vec3 x, tin_vec3 y);
 tin_vec3 tin_cross_v3(tin_vec3 a, tin_vec3 b);
 tin_scalar tin_dot_v3(tin_vec3 a, tin_vec3 b);
 tin_vec3 tin_normalize_v3(tin_vec3 v);
+tin_vec3 tin_hadamard_v3(tin_vec3 a, tin_vec3 b);
 
 /* Quaternions */
 
@@ -119,7 +120,6 @@ typedef struct {
 	tin_scalar bias;
 } tin_contact;
 
-int tin_mpr_intersect(const tin_polysum *ps, const tin_ray *ray, tin_contact *contact);
 int tin_polytope_collide(
 	const tin_polytope *pa, const tin_transform *ta,
 	const tin_polytope *pb, const tin_transform *tb,

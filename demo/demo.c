@@ -154,7 +154,11 @@ main(void)
 				1.0f
 			},
 			&cone_polytope,
-			TIN_CONVEX
+			TIN_CONVEX,
+			1.0f / 5.0f,
+			{{ 0.0f, 0.0f, 0.0f }}, /* TODO determine inertia! */
+			{{ 0.0f, 0.0f, 0.0f }},
+			{{ 0.0f, 0.0f, 0.0f }},
 		},
 		&cone_model
 	};
@@ -167,7 +171,11 @@ main(void)
 				0.75f
 			},
 			&cone_polytope,
-			TIN_CONVEX
+			TIN_CONVEX,
+			1.0f / 3.0f,
+			{{ 0.0f, 0.0f, 0.0f }}, /* TODO determine inertia! */
+			{{ 0.0f, 0.0f, 0.0f }},
+			{{ 0.0f, 0.0f, 0.0f }},
 		},
 		&cone_model
 	};
