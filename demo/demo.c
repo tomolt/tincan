@@ -220,34 +220,29 @@ main(void)
 		&cube_model
 	};
 
+	objects[num_objects++] = (Object) {
+		{
+			{
+				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+				(tin_vec3) {{ 0.0f, -23.0f, 0.0f }},
+				20.0f
+			},
+			&cube_polytope,
+			TIN_CONVEX,
+			0.0f,
+			{{ 0.0f, 0.0f, 0.0f }},
+			{{ 0.0f, 0.0f, 0.0f }},
+			{{ 0.0f, 0.0f, 0.0f }},
+		},
+		&cube_model
+	};
+
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 		tin_scalar dt = 1.0f / 60.0f * time_multiplier;
 		tin_scalar inv_dt = 1.0f / dt;
 
 		camera_update(&camera, 1.0f / 60.0f);
-
-		tin_contact contact;
-		int colliding = tin_polytope_collide(objects[0].body.shape_params, &objects[0].body.transform, objects[1].body.shape_params, &objects[1].body.transform, &contact);
-		if (colliding) {
-			printf("D %f\n", tin_dot_v3(contact.normal, tin_sub_v3(objects[1].body.transform.translation, objects[0].body.transform.translation)));
-			tin_arbiter arbiter;
-			arbiter.body1 = &objects[0].body;
-			arbiter.body2 = &objects[1].body;
-			arbiter.num_contacts = 1;
-			arbiter.contacts[0] = contact;
-			tin_arbiter_prestep(&arbiter, inv_dt);
-			printf("%f; %f\n", arbiter.contacts[0].separation, arbiter.contacts[0].bias);
-			tin_arbiter_apply_impulse(&arbiter);
-		}
-
-		for (int o = 0; o < num_objects; o++) {
-			tin_body *b = &objects[o].body;
-			b->transform.translation = tin_saxpy_v3(dt, b->velocity, b->transform.translation);
-			tin_vec3 av = b->angular_velocity;
-			tin_scalar angle = sqrtf(tin_dot_v3(av, av));
-			b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
-		}
 
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
@@ -264,6 +259,44 @@ main(void)
 		render_start_models();
 		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);
 		render_view_matrix = mat4_from_inverse_transform(&camtrf);
+
+		for (int a = 0; a < num_objects; a++) {
+			for (int b = a + 1; b < num_objects; b++) {
+				tin_contact contact;
+				int colliding = tin_polytope_collide(
+					objects[a].body.shape_params, &objects[a].body.transform,
+					objects[b].body.shape_params, &objects[b].body.transform, &contact);
+				if (colliding) {
+					printf("D %f\n", tin_dot_v3(contact.normal, tin_sub_v3(objects[b].body.transform.translation, objects[a].body.transform.translation)));
+					tin_arbiter arbiter;
+					arbiter.body1 = &objects[a].body;
+					arbiter.body2 = &objects[b].body;
+					arbiter.num_contacts = 1;
+					arbiter.contacts[0] = contact;
+					tin_arbiter_prestep(&arbiter, inv_dt);
+					printf("%f; %f\n", arbiter.contacts[0].separation, arbiter.contacts[0].bias);
+					tin_arbiter_apply_impulse(&arbiter);
+				}
+
+				if (colliding) {
+					tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
+					tin_transform trf = ident;
+					trf.scale = 0.1f;
+					trf.translation = tin_fwtrf_point(&objects[a].body.transform, contact.rel1);
+					render_draw_model(&cone_model, &trf, color);
+					trf.translation = tin_fwtrf_point(&objects[b].body.transform, contact.rel2);
+					render_draw_model(&cube_model, &trf, color);
+				}
+			}
+		}
+
+		for (int o = 0; o < num_objects; o++) {
+			tin_body *b = &objects[o].body;
+			b->transform.translation = tin_saxpy_v3(dt, b->velocity, b->transform.translation);
+			tin_vec3 av = b->angular_velocity;
+			tin_scalar angle = sqrtf(tin_dot_v3(av, av));
+			b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
+		}
 
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
@@ -285,16 +318,6 @@ main(void)
 				color = (tin_vec3) {{ 1.0f, 1.0f, 1.0f }};
 			}
 			render_draw_model(obj->model, &obj->body.transform, color);
-		}
-
-		if (colliding) {
-			tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
-			tin_transform trf = ident;
-			trf.scale = 0.1f;
-			trf.translation = tin_fwtrf_point(&objects[0].body.transform, contact.rel1);
-			render_draw_model(&cone_model, &trf, color);
-			trf.translation = tin_fwtrf_point(&objects[1].body.transform, contact.rel2);
-			render_draw_model(&cone_model, &trf, color);
 		}
 
 		render_start_overlay();
