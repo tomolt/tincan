@@ -270,9 +270,19 @@ tin_refine_portal(const tin_polysum *ps, const tin_ray *r, tin_portal *p)
 		tin_pspoint s;
 		tin_polysum_support(ps, p->normal, &s);
 		
-		tin_vec3 as = tin_sub_v3(s.abs, p->a.abs);
-		if (tin_dot_v3(as, p->normal) < 0.001f * tin_dot_v3(p->normal, p->normal)) {
-			break;
+		{
+			tin_vec3 as = tin_sub_v3(s.abs, p->a.abs);
+			tin_vec3 bs = tin_sub_v3(s.abs, p->b.abs);
+			tin_vec3 cs = tin_sub_v3(s.abs, p->c.abs);
+			if (tin_dot_v3(as, p->normal) <= 0.0f) {
+				break;
+			}
+			if (tin_dot_v3(bs, p->normal) <= 0.0f) {
+				break;
+			}
+			if (tin_dot_v3(cs, p->normal) <= 0.0f) {
+				break;
+			}
 		}
 		
 		tin_vec3 os = tin_sub_v3(s.abs, r->origin);
@@ -363,7 +373,7 @@ tin_polytope_collide(
 	}
 	tin_refine_portal(&ps, &r, &p);
 	p.normal = tin_normalize_v3(p.normal);
-	if (tin_dot_v3(p.normal, p.a.abs) < -0.1f) {
+	if (tin_dot_v3(p.normal, p.a.abs) <= 0.0f) {
 		return 0;
 	}
 	p.normal = tin_normalize_v3(p.normal);
