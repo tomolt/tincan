@@ -324,7 +324,7 @@ main(void)
 			b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
 
 			if (b->inv_mass != 0.0f) {
-				b->velocity = tin_saxpy_v3(dt, (tin_vec3) {{ 0.0f, -3.0f, 0.0f }}, b->velocity);
+				b->velocity = tin_saxpy_v3(dt, (tin_vec3) {{ 0.0f, -6.0f, 0.0f }}, b->velocity);
 			}
 		}
 

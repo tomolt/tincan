@@ -362,7 +362,8 @@ tin_polytope_collide(
 		return 0;
 	}
 	tin_refine_portal(&ps, &r, &p);
-	if (tin_dot_v3(p.normal, p.a.abs) < 0.0f) {
+	p.normal = tin_normalize_v3(p.normal);
+	if (tin_dot_v3(p.normal, p.a.abs) < -0.1f) {
 		return 0;
 	}
 	p.normal = tin_normalize_v3(p.normal);
@@ -376,9 +377,6 @@ tin_polytope_collide(
 			break;
 		}
 		tin_refine_portal(&ps, &nr, &np);
-		if (tin_dot_v3(np.normal, np.a.abs) < 0.0f) {
-			return 0;
-		}
 		np.normal = tin_normalize_v3(np.normal);
 
 		tin_scalar proj = tin_dot_v3(p.normal, np.normal);
@@ -410,7 +408,8 @@ tin_distsq_v3(tin_vec3 a, tin_vec3 b)
 void
 tin_arbiter_update(tin_arbiter *a)
 {
-	const tin_scalar max_separation = 0.1f;
+	const tin_scalar max_separation = 0.5f;
+	const tin_scalar max_stretch_factor = 2.0f;
 
 	tin_body *b1 = a->body1;
 	tin_body *b2 = a->body2;
@@ -430,7 +429,7 @@ tin_arbiter_update(tin_arbiter *a)
 		}
 
 		tin_scalar stretch = tin_distsq_v3(p1, p2);
-		if (stretch > c->base_stretch * (2.0f * 2.0f)) {
+		if (stretch > c->base_stretch * (max_stretch_factor * max_stretch_factor)) {
 			*c = a->contacts[--a->num_contacts];
 			i--;
 			continue;
@@ -476,7 +475,7 @@ void
 tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
 {
 	const tin_scalar allowed_penetration = 0.01f;
-	const tin_scalar bias_factor = 0.05f;
+	const tin_scalar bias_factor = 0.2f;
 
 	tin_body *b1 = a->body1;
 	tin_body *b2 = a->body2;
