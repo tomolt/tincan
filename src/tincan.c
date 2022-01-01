@@ -399,17 +399,17 @@ tin_solve_inertia(const tin_body *b, tin_vec3 vec)
 }
 
 static tin_scalar
-tin_distsq_v3(tin_vec3 a, tin_vec3 b)
+tin_length_v3(tin_vec3 v)
 {
-	tin_vec3 d = tin_sub_v3(a, b);
-	return tin_dot_v3(d, d);
+	return sqrtf(tin_dot_v3(v, v));
 }
 
 void
 tin_arbiter_update(tin_arbiter *a)
 {
-	const tin_scalar max_separation = 0.5f;
-	const tin_scalar max_stretch_factor = 2.0f;
+	const tin_scalar max_separation = 0.1f;
+	//const tin_scalar max_stretch_factor = 2.0f;
+	const tin_scalar max_stretch = 0.3f;
 
 	tin_body *b1 = a->body1;
 	tin_body *b2 = a->body2;
@@ -428,8 +428,8 @@ tin_arbiter_update(tin_arbiter *a)
 			continue;
 		}
 
-		tin_scalar stretch = tin_distsq_v3(p1, p2);
-		if (stretch > c->base_stretch * (max_stretch_factor * max_stretch_factor)) {
+		tin_scalar stretch = tin_length_v3(tin_gram_schmidt(c->normal, tin_sub_v3(p1, p2)));
+		if (stretch > max_stretch) {
 			*c = a->contacts[--a->num_contacts];
 			i--;
 			continue;
@@ -447,7 +447,7 @@ tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact)
 	tin_vec3 p1, p2;
 	p1 = tin_fwtrf_point(&b1->transform, contact.rel1);
 	p2 = tin_fwtrf_point(&b2->transform, contact.rel2);
-	contact.base_stretch = tin_distsq_v3(p1, p2);
+	contact.base_stretch = tin_length_v3(tin_gram_schmidt(contact.normal, tin_sub_v3(p1, p2)));
 
 	if (a->num_contacts < 4) {
 		a->contacts[a->num_contacts++] = contact;
@@ -462,7 +462,8 @@ tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact)
 		p1 = tin_fwtrf_point(&b1->transform, c->rel1);
 		p2 = tin_fwtrf_point(&b2->transform, c->rel2);
 		tin_vec3 old_pos = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
-		tin_scalar dist = tin_distsq_v3(old_pos, new_pos);
+		tin_vec3 diff = tin_sub_v3(old_pos, new_pos);
+		tin_scalar dist = tin_dot_v3(diff, diff);
 		if (dist < best_dist) {
 			best_i = i;
 			best_dist = dist;
