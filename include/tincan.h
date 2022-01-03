@@ -126,11 +126,13 @@ int tin_polytope_collide(
 	const tin_polytope *pb, const tin_transform *tb,
 	tin_contact *contact);
 
+#define TIN_MAX_CONTACTS 5
+
 typedef struct {
 	tin_body *body1;
 	tin_body *body2;
 	int num_contacts;
-	tin_contact contacts[4];
+	tin_contact contacts[TIN_MAX_CONTACTS];
 } tin_arbiter;
 
 void tin_arbiter_update(tin_arbiter *a);

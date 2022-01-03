@@ -418,7 +418,6 @@ void
 tin_arbiter_update(tin_arbiter *a)
 {
 	const tin_scalar max_separation = 0.1f;
-	//const tin_scalar max_stretch_factor = 2.0f;
 	const tin_scalar max_stretch = 0.3f;
 
 	tin_body *b1 = a->body1;
@@ -459,7 +458,7 @@ tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact)
 	p2 = tin_fwtrf_point(&b2->transform, contact.rel2);
 	contact.base_stretch = tin_length_v3(tin_gram_schmidt(contact.normal, tin_sub_v3(p1, p2)));
 
-	if (a->num_contacts < 4) {
+	if (a->num_contacts < TIN_MAX_CONTACTS) {
 		a->contacts[a->num_contacts++] = contact;
 		return;
 	}
@@ -531,8 +530,6 @@ tin_arbiter_apply_impulse(tin_arbiter *a)
 
 		/* Compute normal impulse */
 		tin_scalar magnitude = c->normal_mass * (-tin_dot_v3(v_rel, c->normal) + c->bias);
-		printf("normal_mass = %f\n", c->normal_mass);
-		printf("magnitude = %f\n", magnitude);
 		magnitude = MAX(magnitude, 0.0f);
 		tin_vec3 impulse = tin_scale_v3(magnitude, c->normal);
 
