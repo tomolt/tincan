@@ -125,8 +125,8 @@ tin_prlgram_area(tin_vec3 e1, tin_vec3 e2)
 tin_vec3
 tin_fwtrf_point(const tin_transform *transform, tin_vec3 vec)
 {
-	vec = tin_apply_qt(transform->rotation,    vec);
 	vec = tin_scale_v3(transform->scale,       vec);
+	vec = tin_apply_qt(transform->rotation,    vec);
 	vec = tin_add_v3  (transform->translation, vec);
 	return vec;
 }
@@ -141,8 +141,8 @@ tin_vec3
 tin_bwtrf_point(const tin_transform *transform, tin_vec3 vec)
 {
 	vec = tin_sub_v3  (vec, transform->translation);
-	vec = tin_scale_v3(1.0f / transform->scale, vec);
 	vec = tin_apply_qt(tin_conjugate_qt(transform->rotation), vec);
+	vec = tin_scale_v3(1.0f / transform->scale, vec);
 	return vec;
 }
 
@@ -376,7 +376,6 @@ tin_polytope_collide(
 	if (tin_dot_v3(p.normal, p.a.abs) <= 0.0f) {
 		return 0;
 	}
-	p.normal = tin_normalize_v3(p.normal);
 
 	for (int it = 0; it < 4; it++) {
 		tin_ray nr;
@@ -485,7 +484,7 @@ void
 tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
 {
 	const tin_scalar allowed_penetration = 0.01f;
-	const tin_scalar bias_factor = 0.2f;
+	const tin_scalar bias_factor = 0.1f;
 
 	tin_body *b1 = a->body1;
 	tin_body *b2 = a->body2;
@@ -503,9 +502,9 @@ tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
 		tin_vec3 r2 = tin_sub_v3(c->position, b2->transform.translation);
 
 		/* Precompute normal mass and bias */
-		c->normal_mass = b1->inv_mass + b2->inv_mass + tin_dot_v3(c->normal, tin_add_v3(
+		c->normal_mass = 1.0f / (b1->inv_mass + b2->inv_mass + tin_dot_v3(c->normal, tin_add_v3(
 			tin_cross_v3(tin_solve_inertia(b1, tin_cross_v3(r1, c->normal)), r1),
-			tin_cross_v3(tin_solve_inertia(b2, tin_cross_v3(r2, c->normal)), r2)));
+			tin_cross_v3(tin_solve_inertia(b2, tin_cross_v3(r2, c->normal)), r2))));
 
 		c->bias = -bias_factor * inv_dt * MIN(0.0f, c->separation + allowed_penetration);
 	}
