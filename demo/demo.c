@@ -41,10 +41,10 @@ init_cone(int tessel)
 
 	for (int v = 0; v < tessel; v++) {
 		float angle = 2.0f * M_PI * v / tessel;
-		verts[v] = (tin_vec3) {{ cosf(angle), -1.0f, sinf(angle) }};
+		verts[v] = (tin_vec3) {{ cosf(angle), 0.5f, sinf(angle) }};
 	}
-	verts[tessel + 0] = (tin_vec3) {{ 0.0f, 1.0f, 0.0f }};
-	verts[tessel + 1] = (tin_vec3) {{ 0.0f, -1.0f, 0.0f }};
+	verts[tessel + 0] = (tin_vec3) {{ 0.0f, -1.5f, 0.0f }};
+	verts[tessel + 1] = (tin_vec3) {{ 0.0f, 0.5f, 0.0f }};
 
 	for (int v = 0; v < tessel; v++) {
 		int w = (v + 1) % tessel;
@@ -195,7 +195,11 @@ main(void)
 			&cone_polytope,
 			TIN_CONVEX,
 			1.0f / 1.0f,
-			{{ 3.0f / 16.0f / 1.0f, 3.0f / 16.0f / 1.0f, 3.0f / 16.0f / 1.0f }}, /* TODO determine actual inertia! */
+			{{
+				1.0f / (1.0f * 3.0f * ((1.0f * 1.0f) / 20.0f + (2.0f * 2.0f) / 80.0f)),
+				1.0f / (1.0f * 3.0f / 10.0f * (1.0f * 1.0f)),
+				1.0f / (1.0f * 3.0f * ((1.0f * 1.0f) / 20.0f + (2.0f * 2.0f) / 80.0f)),
+			}},
 			//{{ 0.0f, 0.0f, -0.5f }},
 			{{ 0.0f, 0.0f, 0.0f }},
 			{{ 0.0f, 0.0f, 0.0f }},
@@ -208,13 +212,17 @@ main(void)
 			{
 				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
 				(tin_vec3) {{ 4.0f, 0.9f, -0.3f }},
-				0.75f
+				1.0f
 			},
 			&cube_polytope,
 			TIN_CONVEX,
 			1.0f / 3.0f,
-			{{ 3.0f / 16.0f / 3.0f, 3.0f / 16.0f / 3.0f, 3.0f / 16.0f / 3.0f }}, /* TODO determine actual inertia! */
-			{{ -0.5f, 0.0f, 0.0f }},
+			{{
+				 1.0f / (2.0f / 3.0f * 3.0f),
+				 1.0f / (2.0f / 3.0f * 3.0f),
+				 1.0f / (2.0f / 3.0f * 3.0f),
+			}},
+			{{ -1.0f, 0.0f, 0.0f }},
 			{{ 0.0f, 0.0f, 0.0f }},
 			//{{ 0.1f, 0.1f, 0.0f }},
 		},
