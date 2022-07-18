@@ -2,7 +2,9 @@
 #define TINCAN_PHYSICS_H
 
 #include <stdint.h>
+#include <float.h>
 
+#define TIN_EPSILON FLT_EPSILON
 typedef float tin_scalar;
 
 /* 3D Vectors */

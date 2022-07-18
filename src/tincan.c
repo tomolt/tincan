@@ -546,7 +546,12 @@ tin_arbiter_apply_impulse(tin_arbiter *a, tin_scalar inv_dt)
 		tin_apply_impulse(b2, impulse, r2);
 
 		/* Compute friction impulse */
-		tin_vec3 friction = tin_scale_v3(-0.2f / inv_dt, tin_gram_schmidt(c->normal, v_rel));
+		tin_scalar friction_coefficient = 0.2f;
+		tin_vec3 friction = tin_gram_schmidt(c->normal, v_rel);
+		if (tin_dot_v3(friction, friction) <= 10.0f * TIN_EPSILON) {
+			friction_coefficient *= 2.0f;
+		}
+		friction = tin_scale_v3(-friction_coefficient / inv_dt, friction);
 		if (b1->inv_mass > 0.0f) {
 			tin_apply_impulse(b1, tin_scale_v3(-1.0f / b1->inv_mass, friction), r1);
 		}
