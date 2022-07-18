@@ -222,7 +222,7 @@ main(void)
 				 1.0f / (2.0f / 3.0f * 3.0f),
 				 1.0f / (2.0f / 3.0f * 3.0f),
 			}},
-			{{ -1.0f, 0.0f, 0.0f }},
+			{{ -5.0f, 0.0f, 0.0f }},
 			{{ 0.0f, 0.0f, 0.0f }},
 			//{{ 0.1f, 0.1f, 0.0f }},
 		},
@@ -319,7 +319,7 @@ main(void)
 			for (int a = 0; a < num_objects; a++) {
 				for (int b = a + 1; b < num_objects; b++) {
 					tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-					tin_arbiter_apply_impulse(arbiter);
+					tin_arbiter_apply_impulse(arbiter, inv_dt);
 				}
 			}
 		}

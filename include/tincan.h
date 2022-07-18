@@ -138,6 +138,6 @@ typedef struct {
 void tin_arbiter_update(tin_arbiter *a);
 void tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact);
 void tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt);
-void tin_arbiter_apply_impulse(tin_arbiter *a);
+void tin_arbiter_apply_impulse(tin_arbiter *a, tin_scalar inv_dt);
 
 #endif

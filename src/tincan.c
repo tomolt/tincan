@@ -511,7 +511,15 @@ tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
 }
 
 void
-tin_arbiter_apply_impulse(tin_arbiter *a)
+tin_apply_impulse(tin_body *body, tin_vec3 impulse, tin_vec3 at)
+{
+	body->velocity = tin_add_v3(body->velocity, tin_scale_v3(body->inv_mass, impulse));
+	body->angular_velocity = tin_add_v3(body->angular_velocity,
+		tin_solve_inertia(body, tin_cross_v3(at, impulse)));
+}
+
+void
+tin_arbiter_apply_impulse(tin_arbiter *a, tin_scalar inv_dt)
 {
 	tin_body *b1 = a->body1;
 	tin_body *b2 = a->body2;
@@ -534,12 +542,16 @@ tin_arbiter_apply_impulse(tin_arbiter *a)
 		tin_vec3 impulse = tin_scale_v3(magnitude, c->normal);
 
 		/* Apply contact impulse */
-		b1->velocity = tin_sub_v3(b1->velocity, tin_scale_v3(b1->inv_mass, impulse));
-		b1->angular_velocity = tin_sub_v3(b1->angular_velocity,
-			tin_solve_inertia(b1, tin_cross_v3(r1, impulse)));
+		tin_apply_impulse(b1, tin_neg_v3(impulse), r1);
+		tin_apply_impulse(b2, impulse, r2);
 
-		b2->velocity = tin_add_v3(b2->velocity, tin_scale_v3(b2->inv_mass, impulse));
-		b2->angular_velocity = tin_add_v3(b2->angular_velocity,
-			tin_solve_inertia(b2, tin_cross_v3(r2, impulse)));
+		/* Compute friction impulse */
+		tin_vec3 friction = tin_scale_v3(-0.2f / inv_dt, tin_gram_schmidt(c->normal, v_rel));
+		if (b1->inv_mass > 0.0f) {
+			tin_apply_impulse(b1, tin_scale_v3(-1.0f / b1->inv_mass, friction), r1);
+		}
+		if (b2->inv_mass > 0.0f) {
+			tin_apply_impulse(b2, tin_scale_v3(1.0f / b2->inv_mass, friction), r2);
+		}
 	}
 }
