@@ -80,6 +80,7 @@ cat <<END >>"$MAKEFILE"
 all: libtincan.a demo.elf
 clean: tincan_clean demo_clean
 
+demo.elf: libtincan.a
 END
 
 SUBPROJ="tincan"
