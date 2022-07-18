@@ -13,7 +13,7 @@
 #define OVERLAY_VBO_CAPACITY 4096
 
 static GLuint  model_prog;
-static GLuint  model_uniforms[4];
+static GLuint  model_uniforms[5];
 static GLuint  model_vbo;
 static GLuint  model_ibo;
 static GLuint  model_vao;
@@ -44,6 +44,7 @@ static const char *common_vert_src =
 static const char *model_frag_src =
 	"#version 330 core\n"
 	"uniform mat4 model_view_matrix;\n"
+	"uniform mat4 view_matrix;\n"
 	"uniform vec3 light_dir;\n"
 	"uniform vec4 base_color;\n"
 	"in vec4 view_position;\n"
@@ -52,7 +53,7 @@ static const char *model_frag_src =
 	"	vec3 tangent = dFdx(view_position.xyz);\n"
 	"	vec3 bitangent = dFdy(view_position.xyz);\n"
 	"	vec3 normal = normalize(cross(tangent, bitangent));\n"
-	"	vec3 view_light_dir = vec3(model_view_matrix * vec4(light_dir, 0.0));\n"
+	"	vec3 view_light_dir = vec3(view_matrix * vec4(light_dir, 0.0));\n"
 	"	float diffuse = max(dot(normal, -view_light_dir), 0.0);\n"
 	"	frag_color = base_color * (0.8 * diffuse + 0.2);\n"
 	"}\n";
@@ -119,9 +120,10 @@ init_progs(void)
 
 	model_prog = shader_link(common_vert, model_frag);
 	model_uniforms[0] = glGetUniformLocation(model_prog, "model_view_matrix");
-	model_uniforms[1] = glGetUniformLocation(model_prog, "proj_matrix");
-	model_uniforms[2] = glGetUniformLocation(model_prog, "light_dir");
-	model_uniforms[3] = glGetUniformLocation(model_prog, "base_color");
+	model_uniforms[1] = glGetUniformLocation(model_prog, "view_matrix");
+	model_uniforms[2] = glGetUniformLocation(model_prog, "proj_matrix");
+	model_uniforms[3] = glGetUniformLocation(model_prog, "light_dir");
+	model_uniforms[4] = glGetUniformLocation(model_prog, "base_color");
 
 	overlay_prog = shader_link(common_vert, overlay_frag);
 	overlay_uniforms[0] = glGetUniformLocation(overlay_prog, "model_view_matrix");
@@ -211,8 +213,8 @@ render_start_models(void)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model_ibo);
 	glEnable(GL_DEPTH_TEST);
 
-	tin_vec3 light_dir = tin_normalize_v3((tin_vec3) {{ -1.0f, -1.0f, 0.0f }});
-	glUniform3fv(model_uniforms[2], 1, light_dir.c);
+	tin_vec3 light_dir = tin_normalize_v3((tin_vec3) {{ -0.3f, -0.6f, 0.0f }});
+	glUniform3fv(model_uniforms[3], 1, light_dir.c);
 }
 
 void
@@ -221,8 +223,9 @@ render_draw_model(const Model *model, const tin_transform *transform, tin_vec3 c
 	Mat4 model_matrix = mat4_from_transform(transform);
 	Mat4 model_view_matrix = mat4_multiply(render_view_matrix, model_matrix);
 	glUniformMatrix4fv(model_uniforms[0], 1, GL_FALSE, model_view_matrix.c);
-	glUniformMatrix4fv(model_uniforms[1], 1, GL_FALSE, render_proj_matrix.c);
-	glUniform4f(model_uniforms[3], color.c[0], color.c[1], color.c[2], 1.0f);
+	glUniformMatrix4fv(model_uniforms[1], 1, GL_FALSE, render_view_matrix.c);
+	glUniformMatrix4fv(model_uniforms[2], 1, GL_FALSE, render_proj_matrix.c);
+	glUniform4f(model_uniforms[4], color.c[0], color.c[1], color.c[2], 1.0f);
 
 	glDrawElementsBaseVertex(GL_TRIANGLES, model->index_count,
 		GL_UNSIGNED_SHORT, (void *) (model->base_index * sizeof (GLushort)), model->base_vertex);
