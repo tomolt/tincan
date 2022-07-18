@@ -32,6 +32,8 @@ static Model        cube_model;
 
 static float time_multiplier = 1.0f;
 
+static int projectile;
+
 static void
 init_cone(int tessel)
 {
@@ -127,6 +129,16 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 		break;
 	case GLFW_KEY_KP_SUBTRACT:
 		time_multiplier /= 2.0f;
+		break;
+
+	case GLFW_KEY_SPACE:
+		if (action == GLFW_PRESS) {
+			tin_vec3 forward = tin_apply_qt(camera.quat, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }});
+			objects[projectile].body.transform.translation = camera.position;
+			objects[projectile].body.transform.rotation = camera.quat;
+			objects[projectile].body.velocity = tin_scale_v3(25.0f, forward);
+			objects[projectile].body.angular_velocity = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
+		}
 		break;
 	}
 }
@@ -248,6 +260,29 @@ main(void)
 		},
 		&cube_model,
 		{{ 1.0f, 1.0f, 1.0f }}
+	};
+
+	projectile = num_objects;
+	objects[num_objects++] = (Object) {
+		{
+			{
+				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+				(tin_vec3) {{ 1000.0f, 0.0f, 1000.0f }},
+				0.2f
+			},
+			&cube_polytope,
+			TIN_CONVEX,
+			1.0f / 0.5f,
+			{{
+				 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
+				 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
+				 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
+			}},
+			{{ 0.0f, 0.0f, 0.0f }},
+			{{ 0.0f, 0.0f, 0.0f }},
+		},
+		&cube_model,
+		{{ 0.5f, 0.5f, 1.0f }}
 	};
 
 	while (!glfwWindowShouldClose(window)) {
