@@ -17,6 +17,7 @@
 typedef struct {
 	tin_body body;
 	Model   *model;
+	tin_vec3 color;
 } Object;
 
 static Camera camera;
@@ -204,7 +205,8 @@ main(void)
 			{{ 0.0f, 0.0f, 0.0f }},
 			{{ 0.0f, 0.0f, 0.0f }},
 		},
-		&cone_model
+		&cone_model,
+		{{ 0.5f, 1.0f, 0.5f }}
 	};
 
 	objects[num_objects++] = (Object) {
@@ -226,7 +228,8 @@ main(void)
 			{{ 0.0f, 0.0f, 0.0f }},
 			//{{ 0.1f, 0.1f, 0.0f }},
 		},
-		&cube_model
+		&cube_model,
+		{{ 1.0f, 0.5f, 0.5f }}
 	};
 
 	objects[num_objects++] = (Object) {
@@ -243,7 +246,8 @@ main(void)
 			{{ 0.0f, 0.0f, 0.0f }},
 			{{ 0.0f, 0.0f, 0.0f }},
 		},
-		&cube_model
+		&cube_model,
+		{{ 1.0f, 1.0f, 1.0f }}
 	};
 
 	while (!glfwWindowShouldClose(window)) {
@@ -342,7 +346,6 @@ main(void)
 			dot.num_vertices = 1;
 			dot.vertices = malloc(1 * sizeof *dot.vertices);
 			dot.vertices[0] = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
-			tin_vec3 color = {{ 1.0f, 1.0f, 1.0f }};
 #if 0
 			tin_polysum sum;
 			sum.former_polytope = obj->body.shape_params;
@@ -357,7 +360,7 @@ main(void)
 				color = (tin_vec3) {{ 1.0f, 1.0f, 1.0f }};
 			}
 #endif
-			render_draw_model(obj->model, &obj->body.transform, color);
+			render_draw_model(obj->model, &obj->body.transform, obj->color);
 		}
 
 		render_start_overlay();
