@@ -308,25 +308,57 @@ main(void)
 		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);
 		render_view_matrix = mat4_from_inverse_transform(&camtrf);
 
-		for (int a = 0; a < num_objects; a++) {
-			for (int b = a + 1; b < num_objects; b++) {
-				tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-				arbiter->body1 = &objects[a].body;
-				arbiter->body2 = &objects[b].body;
-				tin_arbiter_update(arbiter);
+		dt /= 4.0f;
+		inv_dt *= 4.0f;
+		for (int step = 0; step < 4; step++) {
+			for (int a = 0; a < num_objects; a++) {
+				for (int b = a + 1; b < num_objects; b++) {
+					tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
+					arbiter->body1 = &objects[a].body;
+					arbiter->body2 = &objects[b].body;
+					tin_arbiter_update(arbiter);
+				}
 			}
-		}
 
-		for (int a = 0; a < num_objects; a++) {
-			for (int b = a + 1; b < num_objects; b++) {
-				tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-				tin_contact contact;
-				int colliding = tin_polytope_collide(
-					objects[a].body.shape_params, &objects[a].body.transform,
-					objects[b].body.shape_params, &objects[b].body.transform, &contact);
-				if (colliding) {
-					printf("D %f\n", tin_dot_v3(contact.normal, tin_sub_v3(objects[b].body.transform.translation, objects[a].body.transform.translation)));
-					tin_arbiter_add_contact(arbiter, contact);
+			for (int a = 0; a < num_objects; a++) {
+				for (int b = a + 1; b < num_objects; b++) {
+					tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
+					tin_contact contact;
+					int colliding = tin_polytope_collide(
+						objects[a].body.shape_params, &objects[a].body.transform,
+						objects[b].body.shape_params, &objects[b].body.transform, &contact);
+					if (colliding) {
+						printf("D %f\n", tin_dot_v3(contact.normal, tin_sub_v3(objects[b].body.transform.translation, objects[a].body.transform.translation)));
+						tin_arbiter_add_contact(arbiter, contact);
+					}
+				}
+			}
+
+			for (int a = 0; a < num_objects; a++) {
+				for (int b = a + 1; b < num_objects; b++) {
+					tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
+					tin_arbiter_prestep(arbiter, inv_dt);
+				}
+			}
+
+			for (int it = 0; it < 4; it++) {
+				for (int a = 0; a < num_objects; a++) {
+					for (int b = a + 1; b < num_objects; b++) {
+						tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
+						tin_arbiter_apply_impulse(arbiter, inv_dt);
+					}
+				}
+			}
+
+			for (int o = 0; o < num_objects; o++) {
+				tin_body *b = &objects[o].body;
+				b->transform.translation = tin_saxpy_v3(dt, b->velocity, b->transform.translation);
+				tin_vec3 av = b->angular_velocity;
+				tin_scalar angle = sqrtf(tin_dot_v3(av, av));
+				b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
+
+				if (b->inv_mass != 0.0f) {
+					b->velocity = tin_saxpy_v3(dt, (tin_vec3) {{ 0.0f, -6.0f, 0.0f }}, b->velocity);
 				}
 			}
 		}
@@ -344,34 +376,6 @@ main(void)
 					trf.translation = tin_fwtrf_point(&objects[b].body.transform, c->rel2);
 					render_draw_model(&cube_model, &trf, color);
 				}
-			}
-		}
-
-		for (int a = 0; a < num_objects; a++) {
-			for (int b = a + 1; b < num_objects; b++) {
-				tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-				tin_arbiter_prestep(arbiter, inv_dt);
-			}
-		}
-
-		for (int it = 0; it < 4; it++) {
-			for (int a = 0; a < num_objects; a++) {
-				for (int b = a + 1; b < num_objects; b++) {
-					tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-					tin_arbiter_apply_impulse(arbiter, inv_dt);
-				}
-			}
-		}
-
-		for (int o = 0; o < num_objects; o++) {
-			tin_body *b = &objects[o].body;
-			b->transform.translation = tin_saxpy_v3(dt, b->velocity, b->transform.translation);
-			tin_vec3 av = b->angular_velocity;
-			tin_scalar angle = sqrtf(tin_dot_v3(av, av));
-			b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
-
-			if (b->inv_mass != 0.0f) {
-				b->velocity = tin_saxpy_v3(dt, (tin_vec3) {{ 0.0f, -6.0f, 0.0f }}, b->velocity);
 			}
 		}
 
