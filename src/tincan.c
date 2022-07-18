@@ -518,6 +518,7 @@ tin_arbiter_apply_impulse(tin_arbiter *a)
 
 	for (int i = 0; i < a->num_contacts; i++) {
 		tin_contact *c = &a->contacts[i];
+		if (c->separation > 0.0f) continue;
 
 		tin_vec3 r1 = tin_sub_v3(c->position, b1->transform.translation);
 		tin_vec3 r2 = tin_sub_v3(c->position, b2->transform.translation);
