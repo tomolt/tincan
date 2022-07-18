@@ -188,6 +188,7 @@ main(void)
 	glfwSetCursorPosCallback(window, mouse_callback);
 
 	glfwMakeContextCurrent(window);
+	glfwSwapInterval(1);
 	gladLoadGL(glfwGetProcAddress);
 	glEnable(GL_DEPTH_TEST);
 	render_init();
@@ -363,6 +364,8 @@ main(void)
 			}
 		}
 
+		/* draw contact points */
+#if 0
 		for (int a = 0; a < num_objects; a++) {
 			for (int b = a + 1; b < num_objects; b++) {
 				tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
@@ -378,6 +381,7 @@ main(void)
 				}
 			}
 		}
+#endif
 
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
@@ -385,6 +389,7 @@ main(void)
 			dot.num_vertices = 1;
 			dot.vertices = malloc(1 * sizeof *dot.vertices);
 			dot.vertices[0] = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
+			/* ray picking */
 #if 0
 			tin_polysum sum;
 			sum.former_polytope = obj->body.shape_params;
