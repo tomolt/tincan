@@ -353,10 +353,14 @@ main(void)
 
 			for (int o = 0; o < num_objects; o++) {
 				tin_body *b = &objects[o].body;
-				b->transform.translation = tin_saxpy_v3(dt, b->velocity, b->transform.translation);
+				if (tin_dot_v3(b->velocity, b->velocity) > 10000.0f * TIN_EPSILON) {
+					b->transform.translation = tin_saxpy_v3(dt, b->velocity, b->transform.translation);
+				}
 				tin_vec3 av = b->angular_velocity;
 				tin_scalar angle = sqrtf(tin_dot_v3(av, av));
-				b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
+				if (fabs(angle) > 100.0f * TIN_EPSILON) {
+					b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
+				}
 
 				if (b->inv_mass != 0.0f) {
 					b->velocity = tin_saxpy_v3(dt, (tin_vec3) {{ 0.0f, -6.0f, 0.0f }}, b->velocity);
