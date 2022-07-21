@@ -560,3 +560,107 @@ tin_arbiter_apply_impulse(tin_arbiter *a, tin_scalar inv_dt)
 		}
 	}
 }
+
+tin_arbiter *
+tin_find_arbiter(tin_scene *scene, tin_body *body1, tin_body *body2)
+{
+	for (int a = 0; a < scene->numArbiters; a++) {
+		tin_arbiter *arbiter = scene->arbiters[a];
+		if (arbiter->body1 == body1 && arbiter->body2 == body2) {
+			return arbiter;
+		}
+	}
+	return NULL;
+}
+
+void
+tin_scene_update(tin_scene *scene)
+{
+	for (int a = 0; a < scene->numArbiters; a++) {
+		tin_arbiter_update(scene->arbiters[a]);
+	}
+}
+
+void
+tin_detect_collisions(tin_scene *scene)
+{
+	for (int a = 0; a < scene->numBodies; a++) {
+		for (int b = a + 1; b < scene->numBodies; b++) {
+			tin_body *body1 = scene->bodies[a];
+			tin_body *body2 = scene->bodies[b];
+			tin_arbiter *arbiter = tin_find_arbiter(scene, body1, body2);
+			if (!arbiter) continue;
+
+			tin_contact contact;
+			int colliding = tin_polytope_collide(
+					body1->shape_params, &body1->transform,
+					body2->shape_params, &body2->transform, &contact);
+
+			if (colliding) {
+				printf("D %f\n", tin_dot_v3(contact.normal,
+					tin_sub_v3(body2->transform.translation, body1->transform.translation)));
+				tin_arbiter_add_contact(arbiter, contact);
+			}
+		}
+	}
+}
+
+void
+tin_scene_prestep(tin_scene *scene, tin_scalar invDt)
+{
+	for (int a = 0; a < scene->numArbiters; a++) {
+		tin_arbiter *arbiter = scene->arbiters[a];
+		tin_arbiter_prestep(arbiter, invDt);
+	}
+
+}
+
+void
+tin_scene_step(tin_scene *scene, tin_scalar invDt)
+{
+	for (int a = 0; a < scene->numArbiters; a++) {
+		tin_arbiter *arbiter = scene->arbiters[a];
+		tin_arbiter_apply_impulse(arbiter, invDt);
+	}
+}
+
+void
+tin_integrate(tin_scene *scene, tin_scalar dt)
+{
+	for (int b = 0; b < scene->numBodies; b++) {
+		tin_body *body = scene->bodies[b];
+
+		if (tin_dot_v3(body->velocity, body->velocity) > 10000.0f * TIN_EPSILON) {
+			body->transform.translation = tin_saxpy_v3(dt, body->velocity, body->transform.translation);
+		}
+		
+		tin_vec3 av = body->angular_velocity;
+		tin_scalar angle = sqrtf(tin_dot_v3(av, av));
+		
+		if (fabs(angle) > 100.0f * TIN_EPSILON) {
+			body->transform.rotation = tin_mul_qt(
+				tin_make_qt(tin_normalize_v3(av), angle * dt), body->transform.rotation);
+		}
+
+		if (body->inv_mass != 0.0f) {
+			body->velocity = tin_saxpy_v3(dt, (tin_vec3) {{ 0.0f, -6.0f, 0.0f }}, body->velocity);
+		}
+	}
+}
+
+void
+tin_simulate(tin_scene *scene, tin_scalar dt)
+{
+	tin_scalar stepDt = dt / 4.0f;
+	tin_scalar stepInvDt = 1.0f / stepDt;
+	for (int step = 0; step < 4; step++) {
+		tin_scene_update(scene);
+		tin_detect_collisions(scene);
+		tin_scene_prestep(scene, stepInvDt);
+		for (int iter = 0; iter < 4; iter++) {
+			tin_scene_step(scene, stepInvDt);
+		}
+		tin_integrate(scene, stepDt);
+	}
+}
+

@@ -142,4 +142,19 @@ void tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact);
 void tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt);
 void tin_arbiter_apply_impulse(tin_arbiter *a, tin_scalar inv_dt);
 
+typedef struct {
+	tin_body **bodies;
+	tin_arbiter **arbiters;
+	int numBodies;
+	int numArbiters;
+} tin_scene;
+
+tin_arbiter *tin_find_arbiter(tin_scene *scene, tin_body *body1, tin_body *body2);
+void tin_scene_update(tin_scene *scene);
+void tin_detect_collisions(tin_scene *scene);
+void tin_scene_prestep(tin_scene *scene, tin_scalar invDt);
+void tin_scene_step(tin_scene *scene, tin_scalar invDt);
+void tin_integrate(tin_scene *scene, tin_scalar dt);
+void tin_simulate(tin_scene *scene, tin_scalar dt);
+
 #endif

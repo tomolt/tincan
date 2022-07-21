@@ -286,10 +286,25 @@ main(void)
 		{{ 0.5f, 0.5f, 1.0f }}
 	};
 
+	tin_scene scene = { 0 };
+	scene.bodies = calloc(MAX_OBJECTS, sizeof *scene.bodies);
+	scene.numBodies = num_objects;
+	for (int a = 0; a < num_objects; a++) {
+		scene.bodies[a] = &objects[a].body;
+	}
+	scene.arbiters = calloc(MAX_OBJECTS * MAX_OBJECTS, sizeof *scene.arbiters);
+	for (int a = 0; a < num_objects; a++) {
+		for (int b = a + 1; b < num_objects; b++) {
+			tin_arbiter *arbiter = &arbiters[a + b * MAX_OBJECTS];
+			arbiter->body1 = scene.bodies[a];
+			arbiter->body2 = scene.bodies[b];
+			scene.arbiters[scene.numArbiters++] = arbiter;
+		}
+	}
+
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 		tin_scalar dt = 1.0f / 60.0f * time_multiplier;
-		tin_scalar inv_dt = 1.0f / dt;
 
 		camera_update(&camera, 1.0f / 60.0f);
 
@@ -309,64 +324,7 @@ main(void)
 		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);
 		render_view_matrix = mat4_from_inverse_transform(&camtrf);
 
-		dt /= 4.0f;
-		inv_dt *= 4.0f;
-		for (int step = 0; step < 4; step++) {
-			for (int a = 0; a < num_objects; a++) {
-				for (int b = a + 1; b < num_objects; b++) {
-					tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-					arbiter->body1 = &objects[a].body;
-					arbiter->body2 = &objects[b].body;
-					tin_arbiter_update(arbiter);
-				}
-			}
-
-			for (int a = 0; a < num_objects; a++) {
-				for (int b = a + 1; b < num_objects; b++) {
-					tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-					tin_contact contact;
-					int colliding = tin_polytope_collide(
-						objects[a].body.shape_params, &objects[a].body.transform,
-						objects[b].body.shape_params, &objects[b].body.transform, &contact);
-					if (colliding) {
-						printf("D %f\n", tin_dot_v3(contact.normal, tin_sub_v3(objects[b].body.transform.translation, objects[a].body.transform.translation)));
-						tin_arbiter_add_contact(arbiter, contact);
-					}
-				}
-			}
-
-			for (int a = 0; a < num_objects; a++) {
-				for (int b = a + 1; b < num_objects; b++) {
-					tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-					tin_arbiter_prestep(arbiter, inv_dt);
-				}
-			}
-
-			for (int it = 0; it < 4; it++) {
-				for (int a = 0; a < num_objects; a++) {
-					for (int b = a + 1; b < num_objects; b++) {
-						tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-						tin_arbiter_apply_impulse(arbiter, inv_dt);
-					}
-				}
-			}
-
-			for (int o = 0; o < num_objects; o++) {
-				tin_body *b = &objects[o].body;
-				if (tin_dot_v3(b->velocity, b->velocity) > 10000.0f * TIN_EPSILON) {
-					b->transform.translation = tin_saxpy_v3(dt, b->velocity, b->transform.translation);
-				}
-				tin_vec3 av = b->angular_velocity;
-				tin_scalar angle = sqrtf(tin_dot_v3(av, av));
-				if (fabs(angle) > 100.0f * TIN_EPSILON) {
-					b->transform.rotation = tin_mul_qt(tin_make_qt(tin_normalize_v3(av), angle * dt), b->transform.rotation);
-				}
-
-				if (b->inv_mass != 0.0f) {
-					b->velocity = tin_saxpy_v3(dt, (tin_vec3) {{ 0.0f, -6.0f, 0.0f }}, b->velocity);
-				}
-			}
-		}
+		tin_simulate(&scene, dt);
 
 		/* draw contact points */
 #if 0
@@ -427,6 +385,8 @@ main(void)
 		glfwSwapBuffers(window);
 	}
 
+	free(scene.bodies);
+	free(scene.arbiters);
 	render_deinit();
 	glfwTerminate();
 	return 0;
