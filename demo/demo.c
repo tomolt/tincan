@@ -112,7 +112,7 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 	case GLFW_KEY_S: camera.b = action == GLFW_PRESS; break;
 	case GLFW_KEY_D: camera.r = action == GLFW_PRESS; break;
 	
-	case GLFW_KEY_LEFT_ALT:
+	case GLFW_KEY_E:
 		if (action == GLFW_RELEASE) {
 			int mode = glfwGetInputMode(window, GLFW_CURSOR);
 			if (mode == GLFW_CURSOR_NORMAL) {
@@ -123,11 +123,15 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 			}
 		}
 		break;
+
+	case GLFW_KEY_B:
+		time_multiplier = 1.0f;
+		break;
 	
-	case GLFW_KEY_KP_ADD:
+	case GLFW_KEY_M:
 		time_multiplier *= 2.0f;
 		break;
-	case GLFW_KEY_KP_SUBTRACT:
+	case GLFW_KEY_N:
 		time_multiplier /= 2.0f;
 		break;
 
@@ -154,7 +158,7 @@ mouse_callback(GLFWwindow *window, double x, double y)
         float dx = x - camera.cursor_x;
         float dy = y - camera.cursor_y;
 
-        camera.yaw -= dx * 0.003f;
+        camera.yaw -= dx * 0.001f;
         while (camera.yaw < 0.0f) {
                 camera.yaw += 2.0f * M_PI;
         }
@@ -162,7 +166,7 @@ mouse_callback(GLFWwindow *window, double x, double y)
                 camera.yaw -= 2.0f * M_PI;
         }
 
-        camera.pitch -= dy * 0.003f;
+        camera.pitch -= dy * 0.001f;
         if (camera.pitch < -0.5f * M_PI) {
                 camera.pitch = -0.5f * M_PI;
         }
