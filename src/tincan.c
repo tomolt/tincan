@@ -159,18 +159,18 @@ tin_bwtrf_dir(const tin_transform *transform, tin_vec3 vec)
 }
 
 tin_vec3
-tin_polytope_support(const tin_polytope *p, tin_vec3 dir)
+tin_polytope_support(const tin_polytope *polytope, tin_vec3 dir)
 {
-	tin_scalar score, best_score = -INFINITY;
-	int i, best_i = -1;
-	for (i = 0; i < p->num_vertices; i++) {
-		score = tin_dot_v3(p->vertices[i], dir);
-		if (score > best_score) {
-			best_score = score;
-			best_i     = i;
+	tin_scalar bestScore = -INFINITY;
+	int bestIdx = -1;
+	for (int idx = 0; idx < polytope->num_vertices; idx++) {
+		tin_scalar score = tin_dot_v3(polytope->vertices[idx], dir);
+		if (score > bestScore) {
+			bestScore = score;
+			bestIdx   = idx;
 		}
 	}
-	return p->vertices[best_i];
+	return polytope->vertices[bestIdx];
 }
 
 void
@@ -405,40 +405,37 @@ tin_polytope_collide(
 }
 
 tin_vec3
-tin_solve_inertia(const tin_body *b, tin_vec3 vec)
+tin_solve_inertia(const tin_body *body, tin_vec3 vec)
 {
-	vec = tin_bwtrf_dir(&b->transform, vec);
-	vec = tin_hadamard_v3(b->inv_inertia, vec);
-	vec = tin_fwtrf_dir(&b->transform, vec);
+	vec = tin_bwtrf_dir(&body->transform, vec);
+	vec = tin_hadamard_v3(body->inv_inertia, vec);
+	vec = tin_fwtrf_dir(&body->transform, vec);
 	return vec;
 }
 
 void
-tin_arbiter_update(tin_arbiter *a)
+tin_arbiter_update(tin_arbiter *arbiter)
 {
-	const tin_scalar max_separation = 0.1f;
-	const tin_scalar max_stretch = 0.3f;
+	const tin_scalar maxSeparation = 0.1f;
+	const tin_scalar maxStretch = 0.3f;
 
-	tin_body *b1 = a->body1;
-	tin_body *b2 = a->body2;
+	for (int i = 0; i < arbiter->num_contacts; i++) {
+		tin_contact *contact = &arbiter->contacts[i];
 
-	for (int i = 0; i < a->num_contacts; i++) {
-		tin_contact *c = &a->contacts[i];
+		tin_vec3 p1 = tin_fwtrf_point(&arbiter->body1->transform, contact->rel1);
+		tin_vec3 p2 = tin_fwtrf_point(&arbiter->body2->transform, contact->rel2);
 
-		tin_vec3 p1 = tin_fwtrf_point(&b1->transform, c->rel1);
-		tin_vec3 p2 = tin_fwtrf_point(&b2->transform, c->rel2);
+		tin_scalar separation = tin_dot_v3(contact->normal, tin_sub_v3(p2, p1));
 
-		tin_scalar separation = tin_dot_v3(c->normal, tin_sub_v3(p2, p1));
-
-		if (separation > max_separation) {
-			*c = a->contacts[--a->num_contacts];
+		if (separation > maxSeparation) {
+			*contact = arbiter->contacts[--arbiter->num_contacts];
 			i--;
 			continue;
 		}
 
-		tin_scalar stretch = tin_length_v3(tin_gram_schmidt(c->normal, tin_sub_v3(p1, p2)));
-		if (stretch > max_stretch) {
-			*c = a->contacts[--a->num_contacts];
+		tin_scalar stretch = tin_length_v3(tin_gram_schmidt(contact->normal, tin_sub_v3(p1, p2)));
+		if (stretch > maxStretch) {
+			*contact = arbiter->contacts[--arbiter->num_contacts];
 			i--;
 			continue;
 		}
@@ -447,66 +444,60 @@ tin_arbiter_update(tin_arbiter *a)
 }
 
 void
-tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact)
+tin_arbiter_add_contact(tin_arbiter *arbiter, tin_contact contact)
 {
-	tin_body *b1 = a->body1;
-	tin_body *b2 = a->body2;
-
 	tin_vec3 p1, p2;
-	p1 = tin_fwtrf_point(&b1->transform, contact.rel1);
-	p2 = tin_fwtrf_point(&b2->transform, contact.rel2);
+	p1 = tin_fwtrf_point(&arbiter->body1->transform, contact.rel1);
+	p2 = tin_fwtrf_point(&arbiter->body2->transform, contact.rel2);
 	contact.base_stretch = tin_length_v3(tin_gram_schmidt(contact.normal, tin_sub_v3(p1, p2)));
 
-	if (a->num_contacts < TIN_MAX_CONTACTS) {
-		a->contacts[a->num_contacts++] = contact;
+	if (arbiter->num_contacts < TIN_MAX_CONTACTS) {
+		arbiter->contacts[arbiter->num_contacts++] = contact;
 		return;
 	}
 
-	tin_vec3 new_pos = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
-	int best_i = -1;
-	tin_scalar best_dist = INFINITY;
-	for (int i = 0; i < a->num_contacts; i++) {
-		tin_contact *c = &a->contacts[i];
-		p1 = tin_fwtrf_point(&b1->transform, c->rel1);
-		p2 = tin_fwtrf_point(&b2->transform, c->rel2);
-		tin_vec3 old_pos = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
-		tin_vec3 diff = tin_sub_v3(old_pos, new_pos);
+	tin_vec3 newPos = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
+	int bestIdx = -1;
+	tin_scalar bestDist = INFINITY;
+	for (int idx = 0; idx < arbiter->num_contacts; idx++) {
+		tin_contact *c = &arbiter->contacts[idx];
+		p1 = tin_fwtrf_point(&arbiter->body1->transform, c->rel1);
+		p2 = tin_fwtrf_point(&arbiter->body2->transform, c->rel2);
+		tin_vec3 oldPos = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
+		tin_vec3 diff = tin_sub_v3(oldPos, newPos);
 		tin_scalar dist = tin_dot_v3(diff, diff);
-		if (dist < best_dist) {
-			best_i = i;
-			best_dist = dist;
+		if (dist < bestDist) {
+			bestIdx  = idx;
+			bestDist = dist;
 		}
 	}
-	a->contacts[best_i] = contact;
+	arbiter->contacts[bestIdx] = contact;
 }
 
 void
-tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt)
+tin_arbiter_prestep(tin_arbiter *arbiter, tin_scalar invDt)
 {
-	const tin_scalar allowed_penetration = 0.01f;
-	const tin_scalar bias_factor = 0.1f;
+	const tin_scalar allowedPenetration = 0.01f;
+	const tin_scalar biasFactor = 0.1f;
 
-	tin_body *b1 = a->body1;
-	tin_body *b2 = a->body2;
+	for (int i = 0; i < arbiter->num_contacts; i++) {
+		tin_contact *contact = &arbiter->contacts[i];
 
-	for (int i = 0; i < a->num_contacts; i++) {
-		tin_contact *c = &a->contacts[i];
+		tin_vec3 p1 = tin_fwtrf_point(&arbiter->body1->transform, contact->rel1);
+		tin_vec3 p2 = tin_fwtrf_point(&arbiter->body2->transform, contact->rel2);
 
-		tin_vec3 p1 = tin_fwtrf_point(&b1->transform, c->rel1);
-		tin_vec3 p2 = tin_fwtrf_point(&b2->transform, c->rel2);
+		contact->position   = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
+		contact->separation = tin_dot_v3(contact->normal, tin_sub_v3(p2, p1));
 
-		c->position   = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
-		c->separation = tin_dot_v3(c->normal, tin_sub_v3(p2, p1));
-
-		tin_vec3 r1 = tin_sub_v3(c->position, b1->transform.translation);
-		tin_vec3 r2 = tin_sub_v3(c->position, b2->transform.translation);
+		tin_vec3 r1 = tin_sub_v3(contact->position, arbiter->body1->transform.translation);
+		tin_vec3 r2 = tin_sub_v3(contact->position, arbiter->body2->transform.translation);
 
 		/* Precompute normal mass and bias */
-		c->normal_mass = 1.0f / (b1->inv_mass + b2->inv_mass + tin_dot_v3(c->normal, tin_add_v3(
-			tin_cross_v3(tin_solve_inertia(b1, tin_cross_v3(r1, c->normal)), r1),
-			tin_cross_v3(tin_solve_inertia(b2, tin_cross_v3(r2, c->normal)), r2))));
+		contact->normal_mass = 1.0f / (arbiter->body1->inv_mass + arbiter->body2->inv_mass + tin_dot_v3(contact->normal, tin_add_v3(
+			tin_cross_v3(tin_solve_inertia(arbiter->body1, tin_cross_v3(r1, contact->normal)), r1),
+			tin_cross_v3(tin_solve_inertia(arbiter->body2, tin_cross_v3(r2, contact->normal)), r2))));
 
-		c->bias = -bias_factor * inv_dt * MIN(0.0f, c->separation + allowed_penetration);
+		contact->bias = -biasFactor * invDt * MIN(0.0f, contact->separation + allowedPenetration);
 	}
 }
 
@@ -519,44 +510,41 @@ tin_apply_impulse(tin_body *body, tin_vec3 impulse, tin_vec3 at)
 }
 
 void
-tin_arbiter_apply_impulse(tin_arbiter *a, tin_scalar inv_dt)
+tin_arbiter_apply_impulse(tin_arbiter *arbiter, tin_scalar invDt)
 {
-	tin_body *b1 = a->body1;
-	tin_body *b2 = a->body2;
+	for (int i = 0; i < arbiter->num_contacts; i++) {
+		tin_contact *contact = &arbiter->contacts[i];
+		if (contact->separation > 0.0f) continue;
 
-	for (int i = 0; i < a->num_contacts; i++) {
-		tin_contact *c = &a->contacts[i];
-		if (c->separation > 0.0f) continue;
-
-		tin_vec3 r1 = tin_sub_v3(c->position, b1->transform.translation);
-		tin_vec3 r2 = tin_sub_v3(c->position, b2->transform.translation);
+		tin_vec3 r1 = tin_sub_v3(contact->position, arbiter->body1->transform.translation);
+		tin_vec3 r2 = tin_sub_v3(contact->position, arbiter->body2->transform.translation);
 
 		/* Relative velocity at contact */
 		tin_vec3 v_rel = tin_sub_v3(
-			tin_add_v3(b2->velocity, tin_cross_v3(b2->angular_velocity, r2)),
-			tin_add_v3(b1->velocity, tin_cross_v3(b1->angular_velocity, r1)));
+			tin_add_v3(arbiter->body2->velocity, tin_cross_v3(arbiter->body2->angular_velocity, r2)),
+			tin_add_v3(arbiter->body1->velocity, tin_cross_v3(arbiter->body1->angular_velocity, r1)));
 
 		/* Compute normal impulse */
-		tin_scalar magnitude = c->normal_mass * (-tin_dot_v3(v_rel, c->normal) + c->bias);
+		tin_scalar magnitude = contact->normal_mass * (-tin_dot_v3(v_rel, contact->normal) + contact->bias);
 		magnitude = MAX(magnitude, 0.0f);
-		tin_vec3 impulse = tin_scale_v3(magnitude, c->normal);
+		tin_vec3 impulse = tin_scale_v3(magnitude, contact->normal);
 
 		/* Apply contact impulse */
-		tin_apply_impulse(b1, tin_neg_v3(impulse), r1);
-		tin_apply_impulse(b2, impulse, r2);
+		tin_apply_impulse(arbiter->body1, tin_neg_v3(impulse), r1);
+		tin_apply_impulse(arbiter->body2, impulse, r2);
 
 		/* Compute friction impulse */
 		tin_scalar friction_coefficient = 0.2f;
-		tin_vec3 friction = tin_gram_schmidt(c->normal, v_rel);
+		tin_vec3 friction = tin_gram_schmidt(contact->normal, v_rel);
 		if (tin_dot_v3(friction, friction) <= 10.0f * TIN_EPSILON) {
 			friction_coefficient *= 2.0f;
 		}
-		friction = tin_scale_v3(-friction_coefficient / inv_dt, friction);
-		if (b1->inv_mass > 0.0f) {
-			tin_apply_impulse(b1, tin_scale_v3(-1.0f / b1->inv_mass, friction), r1);
+		friction = tin_scale_v3(-friction_coefficient / invDt, friction);
+		if (arbiter->body1->inv_mass > 0.0f) {
+			tin_apply_impulse(arbiter->body1, tin_scale_v3(-1.0f / arbiter->body1->inv_mass, friction), r1);
 		}
-		if (b2->inv_mass > 0.0f) {
-			tin_apply_impulse(b2, tin_scale_v3(1.0f / b2->inv_mass, friction), r2);
+		if (arbiter->body2->inv_mass > 0.0f) {
+			tin_apply_impulse(arbiter->body2, tin_scale_v3(1.0f / arbiter->body2->inv_mass, friction), r2);
 		}
 	}
 }

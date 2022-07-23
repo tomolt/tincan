@@ -76,7 +76,7 @@ typedef struct {
 	tin_scalar radius;
 } tin_polytope;
 
-tin_vec3 tin_polytope_support(const tin_polytope *p, tin_vec3 dir);
+tin_vec3 tin_polytope_support(const tin_polytope *polytope, tin_vec3 dir);
 
 /* Minkowski sum (difference) of transformed convex polytopes */
 typedef struct {
@@ -139,11 +139,11 @@ typedef struct {
 	tin_contact contacts[TIN_MAX_CONTACTS];
 } tin_arbiter;
 
-tin_vec3 tin_solve_inertia(const tin_body *b, tin_vec3 vec);
-void tin_arbiter_update(tin_arbiter *a);
-void tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact);
-void tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt);
-void tin_arbiter_apply_impulse(tin_arbiter *a, tin_scalar inv_dt);
+tin_vec3 tin_solve_inertia(const tin_body *body, tin_vec3 vec);
+void tin_arbiter_update(tin_arbiter *arbiter);
+void tin_arbiter_add_contact(tin_arbiter *arbiter, tin_contact contact);
+void tin_arbiter_prestep(tin_arbiter *arbiter, tin_scalar inv_dt);
+void tin_arbiter_apply_impulse(tin_arbiter *arbiter, tin_scalar inv_dt);
 
 typedef struct {
 	tin_body **bodies;
