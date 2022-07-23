@@ -151,10 +151,11 @@ typedef struct {
 
 tin_arbiter *tin_find_arbiter(tin_scene *scene, tin_body *body1, tin_body *body2);
 void tin_scene_update(tin_scene *scene);
-void tin_detect_collisions(tin_scene *scene);
+void tin_check_collision(tin_scene *scene, tin_body *body1, tin_body *body2);
 void tin_scene_prestep(tin_scene *scene, tin_scalar invDt);
 void tin_scene_step(tin_scene *scene, tin_scalar invDt);
 void tin_integrate(tin_scene *scene, tin_scalar dt);
+void tin_broadphase(tin_scene *scene, void (*func)(tin_scene *, tin_body *, tin_body *));
 void tin_simulate(tin_scene *scene, tin_scalar dt);
 
 #endif

@@ -582,26 +582,20 @@ tin_scene_update(tin_scene *scene)
 }
 
 void
-tin_detect_collisions(tin_scene *scene)
+tin_check_collision(tin_scene *scene, tin_body *body1, tin_body *body2)
 {
-	for (int a = 0; a < scene->numBodies; a++) {
-		for (int b = a + 1; b < scene->numBodies; b++) {
-			tin_body *body1 = scene->bodies[a];
-			tin_body *body2 = scene->bodies[b];
-			tin_arbiter *arbiter = tin_find_arbiter(scene, body1, body2);
-			if (!arbiter) continue;
+	tin_arbiter *arbiter = tin_find_arbiter(scene, body1, body2);
+	if (!arbiter) return;
 
-			tin_contact contact;
-			int colliding = tin_polytope_collide(
-					body1->shape_params, &body1->transform,
-					body2->shape_params, &body2->transform, &contact);
+	tin_contact contact;
+	int colliding = tin_polytope_collide(
+			body1->shape_params, &body1->transform,
+			body2->shape_params, &body2->transform, &contact);
 
-			if (colliding) {
-				printf("D %f\n", tin_dot_v3(contact.normal,
+	if (colliding) {
+		printf("D %f\n", tin_dot_v3(contact.normal,
 					tin_sub_v3(body2->transform.translation, body1->transform.translation)));
-				tin_arbiter_add_contact(arbiter, contact);
-			}
-		}
+		tin_arbiter_add_contact(arbiter, contact);
 	}
 }
 
@@ -649,13 +643,23 @@ tin_integrate(tin_scene *scene, tin_scalar dt)
 }
 
 void
+tin_broadphase(tin_scene *scene, void (*func)(tin_scene *, tin_body *, tin_body *))
+{
+	for (int a = 0; a < scene->numBodies; a++) {
+		for (int b = a + 1; b < scene->numBodies; b++) {
+			func(scene, scene->bodies[a], scene->bodies[b]);
+		}
+	}
+}
+
+void
 tin_simulate(tin_scene *scene, tin_scalar dt)
 {
 	tin_scalar stepDt = dt / 4.0f;
 	tin_scalar stepInvDt = 1.0f / stepDt;
 	for (int step = 0; step < 4; step++) {
 		tin_scene_update(scene);
-		tin_detect_collisions(scene);
+		tin_broadphase(scene, tin_check_collision);
 		tin_scene_prestep(scene, stepInvDt);
 		for (int iter = 0; iter < 4; iter++) {
 			tin_scene_step(scene, stepInvDt);
