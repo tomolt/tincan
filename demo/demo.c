@@ -20,6 +20,8 @@ typedef struct {
 	tin_vec3  color;
 } Object;
 
+tin_scene scene;
+
 static Camera camera;
 static Object objects[MAX_OBJECTS];
 static int    num_objects;
@@ -30,8 +32,6 @@ static tin_polytope cube_polytope;
 static Model        cube_model;
 
 static float time_multiplier = 1.0f;
-
-static int projectile;
 
 static void
 init_cone(int tessel)
@@ -139,10 +139,29 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 	case GLFW_KEY_SPACE:
 		if (action == GLFW_PRESS) {
 			tin_vec3 forward = tin_apply_qt(camera.quat, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }});
-			objects[projectile].body->transform.translation = camera.position;
-			objects[projectile].body->transform.rotation = camera.quat;
-			objects[projectile].body->velocity = tin_scale_v3(25.0f, forward);
-			objects[projectile].body->angular_velocity = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
+			tin_body *body = tin_add_body(&scene);
+			*body = (tin_body) {
+				{
+					camera.quat,
+					camera.position,
+					0.2f,
+				},
+				&cube_polytope,
+				TIN_CONVEX,
+				1.0f / 0.5f,
+				{{
+					 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
+					 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
+					 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
+				}},
+				tin_scale_v3(25.0f, forward),
+				{{ 0.0f, 0.0f, 0.0f }},
+			};
+			objects[num_objects++] = (Object) {
+				body,
+				&cube_model,
+				{{ 0.5f, 0.5f, 1.0f }}
+			};
 		}
 		break;
 	}
@@ -203,8 +222,6 @@ main(void)
 	camera.quat = (tin_quat) { {{ 0.0f, 0.0f, 0.0f }}, 1.0f };
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
 	camera.position.c[2] = 5.0f;
-
-	tin_scene scene = { 0 };
 
 	tin_body *body1 = tin_add_body(&scene);
 	*body1 = (tin_body) {
@@ -274,31 +291,6 @@ main(void)
 		body3,
 		&cube_model,
 		{{ 1.0f, 1.0f, 1.0f }}
-	};
-
-	projectile = num_objects;
-	tin_body *body4 = tin_add_body(&scene);
-	*body4 = (tin_body) {
-		{
-			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-			(tin_vec3) {{ 1000.0f, 0.0f, 1000.0f }},
-			0.2f
-		},
-		&cube_polytope,
-		TIN_CONVEX,
-		1.0f / 0.5f,
-		{{
-			 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
-			 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
-			 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
-		}},
-		{{ 0.0f, 0.0f, 0.0f }},
-		{{ 0.0f, 0.0f, 0.0f }},
-	};
-	objects[num_objects++] = (Object) {
-		body4,
-		&cube_model,
-		{{ 0.5f, 0.5f, 1.0f }}
 	};
 
 	while (!glfwWindowShouldClose(window)) {
