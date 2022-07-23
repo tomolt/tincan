@@ -646,8 +646,18 @@ void
 tin_broadphase(tin_scene *scene, void (*func)(tin_scene *, tin_body *, tin_body *))
 {
 	for (int a = 0; a < scene->numBodies; a++) {
+		tin_body *body1 = scene->bodies[a];
+		const tin_polytope *polytope1 = body1->shape_params;
 		for (int b = a + 1; b < scene->numBodies; b++) {
-			func(scene, scene->bodies[a], scene->bodies[b]);
+			tin_body *body2 = scene->bodies[b];
+			const tin_polytope *polytope2 = body2->shape_params;
+			tin_vec3 diff = tin_sub_v3(body2->transform.translation, body1->transform.translation);
+			tin_scalar radii =
+				polytope2->radius * body2->transform.scale +
+				polytope1->radius * body1->transform.scale;
+			if (tin_dot_v3(diff, diff) <= radii * radii) {
+				func(scene, body1, body2);
+			}
 		}
 	}
 }

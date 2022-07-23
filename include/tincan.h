@@ -70,8 +70,9 @@ typedef struct {
 /* Polytopes */
 
 typedef struct {
-	tin_vec3 *vertices;
-	int       num_vertices;
+	tin_vec3  *vertices;
+	int        num_vertices;
+	tin_scalar radius;
 } tin_polytope;
 
 tin_vec3 tin_polytope_support(const tin_polytope *p, tin_vec3 dir);

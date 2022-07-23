@@ -61,6 +61,7 @@ init_cone(int tessel)
 
 	cone_polytope.vertices     = verts;
 	cone_polytope.num_vertices = nverts;
+	cone_polytope.radius       = 1.5f;
 
 	cone_model = render_make_model(nverts, verts, nindices, indices);
 	
@@ -90,6 +91,7 @@ init_cube(void)
 	};
 	cube_polytope.vertices = verts;
 	cube_polytope.num_vertices = 8;
+	cube_polytope.radius = sqrtf(3.0f);
 	cube_model = render_make_model(8, verts, 6 * 6, indices);
 }
 
