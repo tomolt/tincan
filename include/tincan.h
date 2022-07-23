@@ -19,6 +19,7 @@ tin_vec3 tin_scale_v3(tin_scalar a, tin_vec3 x);
 tin_vec3 tin_saxpy_v3(tin_scalar a, tin_vec3 x, tin_vec3 y);
 tin_vec3 tin_cross_v3(tin_vec3 a, tin_vec3 b);
 tin_scalar tin_dot_v3(tin_vec3 a, tin_vec3 b);
+tin_scalar tin_length_v3(tin_vec3 v);
 tin_vec3 tin_normalize_v3(tin_vec3 v);
 tin_vec3 tin_hadamard_v3(tin_vec3 a, tin_vec3 b);
 
@@ -138,6 +139,7 @@ typedef struct {
 	tin_contact contacts[TIN_MAX_CONTACTS];
 } tin_arbiter;
 
+tin_vec3 tin_solve_inertia(const tin_body *b, tin_vec3 vec);
 void tin_arbiter_update(tin_arbiter *a);
 void tin_arbiter_add_contact(tin_arbiter *a, tin_contact contact);
 void tin_arbiter_prestep(tin_arbiter *a, tin_scalar inv_dt);

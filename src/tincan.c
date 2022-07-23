@@ -53,10 +53,16 @@ tin_dot_v3(tin_vec3 a, tin_vec3 b)
 	return a.c[0]*b.c[0] + a.c[1]*b.c[1] + a.c[2]*b.c[2];
 }
 
+tin_scalar
+tin_length_v3(tin_vec3 v)
+{
+	return sqrtf(tin_dot_v3(v, v));
+}
+
 tin_vec3
 tin_normalize_v3(tin_vec3 v)
 {
-	tin_scalar norm = sqrtf(tin_dot_v3(v, v));
+	tin_scalar norm = tin_length_v3(v);
 	if (norm > 0.0f) {
 		return tin_scale_v3(1.0f / norm, v);
 	} else {
@@ -398,19 +404,13 @@ tin_polytope_collide(
 	return 1;
 }
 
-static tin_vec3
+tin_vec3
 tin_solve_inertia(const tin_body *b, tin_vec3 vec)
 {
 	vec = tin_bwtrf_dir(&b->transform, vec);
 	vec = tin_hadamard_v3(b->inv_inertia, vec);
 	vec = tin_fwtrf_dir(&b->transform, vec);
 	return vec;
-}
-
-static tin_scalar
-tin_length_v3(tin_vec3 v)
-{
-	return sqrtf(tin_dot_v3(v, v));
 }
 
 void
