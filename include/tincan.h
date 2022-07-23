@@ -4,10 +4,23 @@
 #include <stdint.h>
 #include <float.h>
 
-#define TIN_EPSILON FLT_EPSILON
-typedef float tin_scalar;
+/* Dynamic Arrays */
+
+typedef struct {
+	char *elems;
+	int   count;
+	int   capac;
+	int   elemSize;
+} tin_array;
+
+#define TIN_ARRAY_ELEM(array, idx) ((void *) ((array)->elems + (idx) * (array)->elemSize))
+
+void *tin_array_add(tin_array *array);
 
 /* 3D Vectors */
+
+#define TIN_EPSILON FLT_EPSILON
+typedef float tin_scalar;
 
 struct tin_vec3 { tin_scalar c[3]; };
 typedef struct tin_vec3 tin_vec3;
@@ -146,12 +159,8 @@ void tin_arbiter_prestep(tin_arbiter *arbiter, tin_scalar inv_dt);
 void tin_arbiter_apply_impulse(tin_arbiter *arbiter, tin_scalar inv_dt);
 
 typedef struct {
-	tin_body **bodies;
-	tin_arbiter **arbiters;
-	int bodyCount;
-	int bodyCapac;
-	int arbiterCount;
-	int arbiterCapac;
+	tin_array bodies;
+	tin_array arbiters;
 } tin_scene;
 
 tin_arbiter *tin_find_arbiter(tin_scene *scene, tin_body *body1, tin_body *body2);
@@ -162,8 +171,5 @@ void tin_scene_step(tin_scene *scene, tin_scalar invDt);
 void tin_integrate(tin_scene *scene, tin_scalar dt);
 void tin_broadphase(tin_scene *scene, void (*func)(tin_scene *, tin_body *, tin_body *));
 void tin_simulate(tin_scene *scene, tin_scalar dt);
-
-tin_body *tin_add_body(tin_scene *scene);
-tin_arbiter *tin_add_arbiter(tin_scene *scene);
 
 #endif

@@ -2,10 +2,24 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
+
+void *
+tin_array_add(tin_array *array)
+{
+	int idx = array->count++;
+	if (array->count > array->capac) {
+		array->capac = array->capac ? 2 * array->capac : 16;
+		array->elems = realloc(array->elems, array->capac * array->elemSize);
+	}
+	void *elem = TIN_ARRAY_ELEM(array, idx);
+	memset(elem, 0, sizeof array->elemSize);
+	return elem;
+}
 
 tin_vec3
 tin_neg_v3(tin_vec3 x)
@@ -552,15 +566,16 @@ tin_arbiter_apply_impulse(tin_arbiter *arbiter, tin_scalar invDt)
 tin_arbiter *
 tin_find_arbiter(tin_scene *scene, tin_body *body1, tin_body *body2)
 {
-	for (int a = 0; a < scene->arbiterCount; a++) {
-		tin_arbiter *arbiter = scene->arbiters[a];
+	for (int a = 0; a < scene->arbiters.count; a++) {
+		tin_arbiter *arbiter = scene->arbiters.elems[a];
 		if (arbiter->body1 == body1 && arbiter->body2 == body2) {
 			return arbiter;
 		}
 	}
-	tin_arbiter *arbiter = tin_add_arbiter(scene);
+	tin_arbiter *arbiter = calloc(1, sizeof (tin_arbiter));
 	arbiter->body1 = body1;
 	arbiter->body2 = body2;
+	*(tin_arbiter **) tin_array_push(&scene->arbiters) = arbiter;
 	return arbiter;
 }
 
@@ -667,31 +682,5 @@ tin_simulate(tin_scene *scene, tin_scalar dt)
 		}
 		tin_integrate(scene, stepDt);
 	}
-}
-
-tin_body *
-tin_add_body(tin_scene *scene)
-{
-	int idx = scene->bodyCount++;
-	if (scene->bodyCount > scene->bodyCapac) {
-		scene->bodyCapac = scene->bodyCapac ? 2 * scene->bodyCapac : 8;
-		/* TODO reallocarray */
-		scene->bodies = realloc(scene->bodies, scene->bodyCapac * sizeof *scene->bodies);
-	}
-	scene->bodies[idx] = calloc(1, sizeof (tin_body));
-	return scene->bodies[idx];
-}
-
-tin_arbiter *
-tin_add_arbiter(tin_scene *scene)
-{
-	int idx = scene->arbiterCount++;
-	if (scene->arbiterCount > scene->arbiterCapac) {
-		scene->arbiterCapac = scene->arbiterCapac ? 2 * scene->arbiterCapac : 8;
-		/* TODO reallocarray */
-		scene->arbiters = realloc(scene->arbiters, scene->arbiterCapac * sizeof *scene->arbiters);
-	}
-	scene->arbiters[idx] = calloc(1, sizeof (tin_arbiter));
-	return scene->arbiters[idx];
 }
 
