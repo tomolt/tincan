@@ -148,8 +148,10 @@ void tin_arbiter_apply_impulse(tin_arbiter *arbiter, tin_scalar inv_dt);
 typedef struct {
 	tin_body **bodies;
 	tin_arbiter **arbiters;
-	int numBodies;
-	int numArbiters;
+	int bodyCount;
+	int bodyCapac;
+	int arbiterCount;
+	int arbiterCapac;
 } tin_scene;
 
 tin_arbiter *tin_find_arbiter(tin_scene *scene, tin_body *body1, tin_body *body2);
@@ -160,5 +162,8 @@ void tin_scene_step(tin_scene *scene, tin_scalar invDt);
 void tin_integrate(tin_scene *scene, tin_scalar dt);
 void tin_broadphase(tin_scene *scene, void (*func)(tin_scene *, tin_body *, tin_body *));
 void tin_simulate(tin_scene *scene, tin_scalar dt);
+
+tin_body *tin_add_body(tin_scene *scene);
+tin_arbiter *tin_add_arbiter(tin_scene *scene);
 
 #endif

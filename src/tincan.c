@@ -552,19 +552,22 @@ tin_arbiter_apply_impulse(tin_arbiter *arbiter, tin_scalar invDt)
 tin_arbiter *
 tin_find_arbiter(tin_scene *scene, tin_body *body1, tin_body *body2)
 {
-	for (int a = 0; a < scene->numArbiters; a++) {
+	for (int a = 0; a < scene->arbiterCount; a++) {
 		tin_arbiter *arbiter = scene->arbiters[a];
 		if (arbiter->body1 == body1 && arbiter->body2 == body2) {
 			return arbiter;
 		}
 	}
-	return NULL;
+	tin_arbiter *arbiter = tin_add_arbiter(scene);
+	arbiter->body1 = body1;
+	arbiter->body2 = body2;
+	return arbiter;
 }
 
 void
 tin_scene_update(tin_scene *scene)
 {
-	for (int a = 0; a < scene->numArbiters; a++) {
+	for (int a = 0; a < scene->arbiterCount; a++) {
 		tin_arbiter_update(scene->arbiters[a]);
 	}
 }
@@ -590,7 +593,7 @@ tin_check_collision(tin_scene *scene, tin_body *body1, tin_body *body2)
 void
 tin_scene_prestep(tin_scene *scene, tin_scalar invDt)
 {
-	for (int a = 0; a < scene->numArbiters; a++) {
+	for (int a = 0; a < scene->arbiterCount; a++) {
 		tin_arbiter *arbiter = scene->arbiters[a];
 		tin_arbiter_prestep(arbiter, invDt);
 	}
@@ -600,7 +603,7 @@ tin_scene_prestep(tin_scene *scene, tin_scalar invDt)
 void
 tin_scene_step(tin_scene *scene, tin_scalar invDt)
 {
-	for (int a = 0; a < scene->numArbiters; a++) {
+	for (int a = 0; a < scene->arbiterCount; a++) {
 		tin_arbiter *arbiter = scene->arbiters[a];
 		tin_arbiter_apply_impulse(arbiter, invDt);
 	}
@@ -609,7 +612,7 @@ tin_scene_step(tin_scene *scene, tin_scalar invDt)
 void
 tin_integrate(tin_scene *scene, tin_scalar dt)
 {
-	for (int b = 0; b < scene->numBodies; b++) {
+	for (int b = 0; b < scene->bodyCount; b++) {
 		tin_body *body = scene->bodies[b];
 
 		if (tin_dot_v3(body->velocity, body->velocity) > 10000.0f * TIN_EPSILON) {
@@ -633,10 +636,10 @@ tin_integrate(tin_scene *scene, tin_scalar dt)
 void
 tin_broadphase(tin_scene *scene, void (*func)(tin_scene *, tin_body *, tin_body *))
 {
-	for (int a = 0; a < scene->numBodies; a++) {
+	for (int a = 0; a < scene->bodyCount; a++) {
 		tin_body *body1 = scene->bodies[a];
 		const tin_polytope *polytope1 = body1->shape_params;
-		for (int b = a + 1; b < scene->numBodies; b++) {
+		for (int b = a + 1; b < scene->bodyCount; b++) {
 			tin_body *body2 = scene->bodies[b];
 			const tin_polytope *polytope2 = body2->shape_params;
 			tin_vec3 diff = tin_sub_v3(body2->transform.translation, body1->transform.translation);
@@ -664,5 +667,31 @@ tin_simulate(tin_scene *scene, tin_scalar dt)
 		}
 		tin_integrate(scene, stepDt);
 	}
+}
+
+tin_body *
+tin_add_body(tin_scene *scene)
+{
+	int idx = scene->bodyCount++;
+	if (scene->bodyCount > scene->bodyCapac) {
+		scene->bodyCapac = scene->bodyCapac ? 2 * scene->bodyCapac : 8;
+		/* TODO reallocarray */
+		scene->bodies = realloc(scene->bodies, scene->bodyCapac * sizeof *scene->bodies);
+	}
+	scene->bodies[idx] = calloc(1, sizeof (tin_body));
+	return scene->bodies[idx];
+}
+
+tin_arbiter *
+tin_add_arbiter(tin_scene *scene)
+{
+	int idx = scene->arbiterCount++;
+	if (scene->arbiterCount > scene->arbiterCapac) {
+		scene->arbiterCapac = scene->arbiterCapac ? 2 * scene->arbiterCapac : 8;
+		/* TODO reallocarray */
+		scene->arbiters = realloc(scene->arbiters, scene->arbiterCapac * sizeof *scene->arbiters);
+	}
+	scene->arbiters[idx] = calloc(1, sizeof (tin_arbiter));
+	return scene->arbiters[idx];
 }
 

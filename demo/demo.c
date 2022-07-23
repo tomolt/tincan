@@ -15,15 +15,14 @@
 #define MAX_OBJECTS 100
 
 typedef struct {
-	tin_body body;
-	Model   *model;
-	tin_vec3 color;
+	tin_body *body;
+	Model    *model;
+	tin_vec3  color;
 } Object;
 
 static Camera camera;
 static Object objects[MAX_OBJECTS];
 static int    num_objects;
-static tin_arbiter arbiters[MAX_OBJECTS * MAX_OBJECTS];
 
 static tin_polytope cone_polytope;
 static Model        cone_model;
@@ -140,10 +139,10 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 	case GLFW_KEY_SPACE:
 		if (action == GLFW_PRESS) {
 			tin_vec3 forward = tin_apply_qt(camera.quat, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }});
-			objects[projectile].body.transform.translation = camera.position;
-			objects[projectile].body.transform.rotation = camera.quat;
-			objects[projectile].body.velocity = tin_scale_v3(25.0f, forward);
-			objects[projectile].body.angular_velocity = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
+			objects[projectile].body->transform.translation = camera.position;
+			objects[projectile].body->transform.rotation = camera.quat;
+			objects[projectile].body->velocity = tin_scale_v3(25.0f, forward);
+			objects[projectile].body->angular_velocity = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
 		}
 		break;
 	}
@@ -205,108 +204,102 @@ main(void)
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
 	camera.position.c[2] = 5.0f;
 
-	objects[num_objects++] = (Object) {
+	tin_scene scene = { 0 };
+
+	tin_body *body1 = tin_add_body(&scene);
+	*body1 = (tin_body) {
 		{
-			{
-				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-				(tin_vec3) {{ 0.0f, 0.0f, 0.0f }},
-				1.0f
-			},
-			&cone_polytope,
-			TIN_CONVEX,
-			1.0f / 1.0f,
-			{{
-				1.0f / (1.0f * 3.0f * ((1.0f * 1.0f) / 20.0f + (2.0f * 2.0f) / 80.0f)),
-				1.0f / (1.0f * 3.0f / 10.0f * (1.0f * 1.0f)),
-				1.0f / (1.0f * 3.0f * ((1.0f * 1.0f) / 20.0f + (2.0f * 2.0f) / 80.0f)),
-			}},
-			//{{ 0.0f, 0.0f, -0.5f }},
-			{{ 0.0f, 0.0f, 0.0f }},
-			{{ 0.0f, 0.0f, 0.0f }},
+			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			(tin_vec3) {{ 0.0f, 0.0f, 0.0f }},
+			1.0f
 		},
+		&cone_polytope,
+		TIN_CONVEX,
+		1.0f / 1.0f,
+		{{
+			1.0f / (1.0f * 3.0f * ((1.0f * 1.0f) / 20.0f + (2.0f * 2.0f) / 80.0f)),
+			1.0f / (1.0f * 3.0f / 10.0f * (1.0f * 1.0f)),
+			1.0f / (1.0f * 3.0f * ((1.0f * 1.0f) / 20.0f + (2.0f * 2.0f) / 80.0f)),
+		}},
+		//{{ 0.0f, 0.0f, -0.5f }},
+		{{ 0.0f, 0.0f, 0.0f }},
+		{{ 0.0f, 0.0f, 0.0f }},
+	};
+	objects[num_objects++] = (Object) {
+		body1,
 		&cone_model,
 		{{ 0.5f, 1.0f, 0.5f }}
 	};
 
-	objects[num_objects++] = (Object) {
+	tin_body *body2 = tin_add_body(&scene);
+	*body2 = (tin_body) {
 		{
-			{
-				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-				(tin_vec3) {{ 4.0f, 0.9f, -0.3f }},
-				1.0f
-			},
-			&cube_polytope,
-			TIN_CONVEX,
-			1.0f / 3.0f,
-			{{
-				 1.0f / (2.0f / 3.0f * 3.0f),
-				 1.0f / (2.0f / 3.0f * 3.0f),
-				 1.0f / (2.0f / 3.0f * 3.0f),
-			}},
-			{{ -5.0f, 0.0f, 0.0f }},
-			{{ 0.0f, 0.0f, 0.0f }},
-			//{{ 0.1f, 0.1f, 0.0f }},
+			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			(tin_vec3) {{ 4.0f, 0.9f, -0.3f }},
+			1.0f
 		},
+		&cube_polytope,
+		TIN_CONVEX,
+		1.0f / 3.0f,
+		{{
+			 1.0f / (2.0f / 3.0f * 3.0f),
+			 1.0f / (2.0f / 3.0f * 3.0f),
+			 1.0f / (2.0f / 3.0f * 3.0f),
+		}},
+		{{ -5.0f, 0.0f, 0.0f }},
+		{{ 0.0f, 0.0f, 0.0f }},
+		//{{ 0.1f, 0.1f, 0.0f }},
+	};
+	objects[num_objects++] = (Object) {
+		body2,
 		&cube_model,
 		{{ 1.0f, 0.5f, 0.5f }}
 	};
 
-	objects[num_objects++] = (Object) {
+	tin_body *body3 = tin_add_body(&scene);
+	*body3 = (tin_body) {
 		{
-			{
-				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-				(tin_vec3) {{ 0.0f, -23.0f, 0.0f }},
-				20.0f
-			},
-			&cube_polytope,
-			TIN_CONVEX,
-			0.0f,
-			{{ 0.0f, 0.0f, 0.0f }},
-			{{ 0.0f, 0.0f, 0.0f }},
-			{{ 0.0f, 0.0f, 0.0f }},
+			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			(tin_vec3) {{ 0.0f, -23.0f, 0.0f }},
+			20.0f
 		},
+		&cube_polytope,
+		TIN_CONVEX,
+		0.0f,
+		{{ 0.0f, 0.0f, 0.0f }},
+		{{ 0.0f, 0.0f, 0.0f }},
+		{{ 0.0f, 0.0f, 0.0f }},
+	};
+	objects[num_objects++] = (Object) {
+		body3,
 		&cube_model,
 		{{ 1.0f, 1.0f, 1.0f }}
 	};
 
 	projectile = num_objects;
-	objects[num_objects++] = (Object) {
+	tin_body *body4 = tin_add_body(&scene);
+	*body4 = (tin_body) {
 		{
-			{
-				tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-				(tin_vec3) {{ 1000.0f, 0.0f, 1000.0f }},
-				0.2f
-			},
-			&cube_polytope,
-			TIN_CONVEX,
-			1.0f / 0.5f,
-			{{
-				 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
-				 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
-				 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
-			}},
-			{{ 0.0f, 0.0f, 0.0f }},
-			{{ 0.0f, 0.0f, 0.0f }},
+			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			(tin_vec3) {{ 1000.0f, 0.0f, 1000.0f }},
+			0.2f
 		},
+		&cube_polytope,
+		TIN_CONVEX,
+		1.0f / 0.5f,
+		{{
+			 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
+			 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
+			 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
+		}},
+		{{ 0.0f, 0.0f, 0.0f }},
+		{{ 0.0f, 0.0f, 0.0f }},
+	};
+	objects[num_objects++] = (Object) {
+		body4,
 		&cube_model,
 		{{ 0.5f, 0.5f, 1.0f }}
 	};
-
-	tin_scene scene = { 0 };
-	scene.bodies = calloc(MAX_OBJECTS, sizeof *scene.bodies);
-	scene.numBodies = num_objects;
-	for (int a = 0; a < num_objects; a++) {
-		scene.bodies[a] = &objects[a].body;
-	}
-	scene.arbiters = calloc(MAX_OBJECTS * MAX_OBJECTS, sizeof *scene.arbiters);
-	for (int a = 0; a < num_objects; a++) {
-		for (int b = a + 1; b < num_objects; b++) {
-			tin_arbiter *arbiter = &arbiters[a + b * MAX_OBJECTS];
-			arbiter->body1 = scene.bodies[a];
-			arbiter->body2 = scene.bodies[b];
-			scene.arbiters[scene.numArbiters++] = arbiter;
-		}
-	}
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -372,7 +365,7 @@ main(void)
 				color = (tin_vec3) {{ 1.0f, 1.0f, 1.0f }};
 			}
 #endif
-			render_draw_model(obj->model, &obj->body.transform, obj->color);
+			render_draw_model(obj->model, &obj->body->transform, obj->color);
 		}
 
 		render_start_overlay();
