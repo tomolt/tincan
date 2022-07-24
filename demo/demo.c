@@ -15,20 +15,20 @@
 #define MAX_OBJECTS 100
 
 typedef struct {
-	tin_body *body;
+	Tin_Body *body;
 	Model    *model;
-	tin_vec3  color;
+	Tin_Vec3  color;
 } Object;
 
-tin_scene scene;
+Tin_Scene scene;
 
 static Camera camera;
 static Object objects[MAX_OBJECTS];
 static int    num_objects;
 
-static tin_polytope cone_polytope;
+static Tin_Polytope cone_polytope;
 static Model        cone_model;
-static tin_polytope cube_polytope;
+static Tin_Polytope cube_polytope;
 static Model        cube_model;
 
 static float time_multiplier = 1.0f;
@@ -38,15 +38,15 @@ init_cone(int tessel)
 {
 	int nverts   = tessel + 2;
 	int nindices = 6 * tessel;
-	tin_vec3 *verts   = calloc(nverts,   sizeof (tin_vec3));
+	Tin_Vec3 *verts   = calloc(nverts,   sizeof (Tin_Vec3));
 	GLushort *indices = calloc(nindices, sizeof (GLushort));
 
 	for (int v = 0; v < tessel; v++) {
 		float angle = 2.0f * M_PI * v / tessel;
-		verts[v] = (tin_vec3) {{ cosf(angle), 0.5f, sinf(angle) }};
+		verts[v] = (Tin_Vec3) {{ cosf(angle), 0.5f, sinf(angle) }};
 	}
-	verts[tessel + 0] = (tin_vec3) {{ 0.0f, -1.5f, 0.0f }};
-	verts[tessel + 1] = (tin_vec3) {{ 0.0f, 0.5f, 0.0f }};
+	verts[tessel + 0] = (Tin_Vec3) {{ 0.0f, -1.5f, 0.0f }};
+	verts[tessel + 1] = (Tin_Vec3) {{ 0.0f, 0.5f, 0.0f }};
 
 	for (int v = 0; v < tessel; v++) {
 		int w = (v + 1) % tessel;
@@ -70,7 +70,7 @@ init_cone(int tessel)
 static void
 init_cube(void)
 {
-	static tin_vec3 verts[] = {
+	static Tin_Vec3 verts[] = {
 		{{ -1, -1, -1 }},
 		{{  1, -1, -1 }},
 		{{ -1,  1, -1 }},
@@ -138,9 +138,9 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 
 	case GLFW_KEY_SPACE:
 		if (action == GLFW_PRESS) {
-			tin_vec3 forward = tin_apply_qt(camera.quat, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }});
-			tin_body *body = tin_add_body(&scene);
-			*body = (tin_body) {
+			Tin_Vec3 forward = tin_apply_qt(camera.quat, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }});
+			Tin_Body *body = tin_add_body(&scene);
+			*body = (Tin_Body) {
 				body->node,
 				{
 					camera.quat,
@@ -233,21 +233,21 @@ main(void)
 	init_cone(16);
 	init_cube();
 
-	camera.quat = (tin_quat) { {{ 0.0f, 0.0f, 0.0f }}, 1.0f };
+	camera.quat = (Tin_Quat) { {{ 0.0f, 0.0f, 0.0f }}, 1.0f };
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
 	camera.position.c[2] = 5.0f;
 
 	TIN_LIST_INIT(scene.bodies);
 	TIN_LIST_INIT(scene.arbiters);
-	scene.bodyAllocator = (tin_allocator) { (void *) sizeof (tin_body), custom_alloc, custom_free };
-	scene.arbiterAllocator = (tin_allocator) { (void *) sizeof (tin_arbiter), custom_alloc, custom_free };
+	scene.bodyAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Body), custom_alloc, custom_free };
+	scene.arbiterAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Arbiter), custom_alloc, custom_free };
 
-	tin_body *body1 = tin_add_body(&scene);
-	*body1 = (tin_body) {
+	Tin_Body *body1 = tin_add_body(&scene);
+	*body1 = (Tin_Body) {
 		body1->node,
 		{
-			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-			(tin_vec3) {{ 0.0f, 0.0f, 0.0f }},
+			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			(Tin_Vec3) {{ 0.0f, 0.0f, 0.0f }},
 			1.0f
 		},
 		&cone_polytope,
@@ -268,12 +268,12 @@ main(void)
 		{{ 0.5f, 1.0f, 0.5f }}
 	};
 
-	tin_body *body2 = tin_add_body(&scene);
-	*body2 = (tin_body) {
+	Tin_Body *body2 = tin_add_body(&scene);
+	*body2 = (Tin_Body) {
 		body2->node,
 		{
-			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-			(tin_vec3) {{ 4.0f, 0.9f, -0.3f }},
+			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			(Tin_Vec3) {{ 4.0f, 0.9f, -0.3f }},
 			1.0f
 		},
 		&cube_polytope,
@@ -294,12 +294,12 @@ main(void)
 		{{ 1.0f, 0.5f, 0.5f }}
 	};
 
-	tin_body *body3 = tin_add_body(&scene);
-	*body3 = (tin_body) {
+	Tin_Body *body3 = tin_add_body(&scene);
+	*body3 = (Tin_Body) {
 		body3->node,
 		{
-			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-			(tin_vec3) {{ 0.0f, -23.0f, 0.0f }},
+			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			(Tin_Vec3) {{ 0.0f, -23.0f, 0.0f }},
 			20.0f
 		},
 		&cube_polytope,
@@ -317,7 +317,7 @@ main(void)
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-		tin_scalar dt = 1.0f / 60.0f * time_multiplier;
+		Tin_Scalar dt = 1.0f / 60.0f * time_multiplier;
 
 		camera_update(&camera, 1.0f / 60.0f);
 
@@ -328,10 +328,10 @@ main(void)
 		glClearColor(0.7f, 0.9f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		tin_transform camtrf;
+		Tin_Transform camtrf;
 		camera_transform(&camera, &camtrf);
 
-		tin_transform ident = { .rotation = { {{ 0.0f, 0.0f, 0.0f }}, 1.0f }, .scale = 1.0f };
+		Tin_Transform ident = { .rotation = { {{ 0.0f, 0.0f, 0.0f }}, 1.0f }, .scale = 1.0f };
 
 		render_start_models();
 		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);
@@ -343,11 +343,11 @@ main(void)
 #if 0
 		for (int a = 0; a < num_objects; a++) {
 			for (int b = a + 1; b < num_objects; b++) {
-				tin_arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
+				Tin_Arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
 				for (int i = 0; i < arbiter->num_contacts; i++) {
-					const tin_contact *c = &arbiter->contacts[i];
-					tin_vec3 color = {{ 0.0f, 1.0f, 1.0f }};
-					tin_transform trf = ident;
+					const Tin_Contact *c = &arbiter->contacts[i];
+					Tin_Vec3 color = {{ 0.0f, 1.0f, 1.0f }};
+					Tin_Transform trf = ident;
 					trf.scale = 0.1f;
 					trf.translation = tin_fwtrf_point(&objects[a].body.transform, c->rel1);
 					render_draw_model(&cone_model, &trf, color);
@@ -360,23 +360,23 @@ main(void)
 
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
-			tin_polytope dot;
+			Tin_Polytope dot;
 			dot.num_vertices = 1;
 			dot.vertices = malloc(1 * sizeof *dot.vertices);
-			dot.vertices[0] = (tin_vec3) {{ 0.0f, 0.0f, 0.0f }};
+			dot.vertices[0] = (Tin_Vec3) {{ 0.0f, 0.0f, 0.0f }};
 			/* ray picking */
 #if 0
-			tin_polysum sum;
+			Tin_Polysum sum;
 			sum.former_polytope = obj->body.shape_params;
 			sum.former_transform = &obj->body.transform;
 			sum.latter_polytope = &dot;
 			sum.latter_transform = &ident;
-			tin_ray ray = { .origin = camtrf.translation, .dir = tin_apply_qt(camtrf.rotation, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }}) };
-			tin_portal temp_portal;
+			Tin_Ray ray = { .origin = camtrf.translation, .dir = tin_apply_qt(camtrf.rotation, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }}) };
+			Tin_Portal temp_portal;
 			if (tin_construct_portal(&sum, &ray, &temp_portal)) {
-				color = (tin_vec3) {{ 1.0f, 0.0f, 0.0f }};
+				color = (Tin_Vec3) {{ 1.0f, 0.0f, 0.0f }};
 			} else {
-				color = (tin_vec3) {{ 1.0f, 1.0f, 1.0f }};
+				color = (Tin_Vec3) {{ 1.0f, 1.0f, 1.0f }};
 			}
 #endif
 			render_draw_model(obj->model, &obj->body->transform, obj->color);
@@ -389,11 +389,11 @@ main(void)
 
 		int cx = width / 2;
 		int cy = height / 2;
-		render_push_vertex((tin_vec3) {{ cx-6, cy }});
-		render_push_vertex((tin_vec3) {{ cx+5, cy }});
-		render_push_vertex((tin_vec3) {{ cx, cy-5 }});
-		render_push_vertex((tin_vec3) {{ cx, cy+6 }});
-		render_draw_lines((tin_vec3) {{ 1.0f, 1.0f, 1.0f }});
+		render_push_vertex((Tin_Vec3) {{ cx-6, cy }});
+		render_push_vertex((Tin_Vec3) {{ cx+5, cy }});
+		render_push_vertex((Tin_Vec3) {{ cx, cy-5 }});
+		render_push_vertex((Tin_Vec3) {{ cx, cy+6 }});
+		render_draw_lines((Tin_Vec3) {{ 1.0f, 1.0f, 1.0f }});
 
 		glfwSwapBuffers(window);
 	}

@@ -9,8 +9,8 @@
 void
 camera_update(Camera *camera, float inv_dt)
 {
-	camera->quat = tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, camera->yaw);
-	camera->quat = tin_mul_qt(camera->quat, tin_make_qt((tin_vec3) {{ 1.0f, 0.0f, 0.0f }}, camera->pitch));
+	camera->quat = tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, camera->yaw);
+	camera->quat = tin_mul_qt(camera->quat, tin_make_qt((Tin_Vec3) {{ 1.0f, 0.0f, 0.0f }}, camera->pitch));
 	
 	float fb = 0.0f, lr = 0.0f;
 	if (camera->f) fb += 1.0f;
@@ -24,15 +24,15 @@ camera_update(Camera *camera, float inv_dt)
 	fb *= norm;
 	lr *= norm;
 	
-	tin_vec3 fvec = tin_apply_qt(camera->quat, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }});
-	tin_vec3 lvec = tin_apply_qt(camera->quat, (tin_vec3) {{ -1.0f, 0.0f, 0.0f }});
+	Tin_Vec3 fvec = tin_apply_qt(camera->quat, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }});
+	Tin_Vec3 lvec = tin_apply_qt(camera->quat, (Tin_Vec3) {{ -1.0f, 0.0f, 0.0f }});
 	
 	camera->position = tin_saxpy_v3(fb, fvec, camera->position);
 	camera->position = tin_saxpy_v3(lr, lvec, camera->position);
 }
 
 void
-camera_transform(const Camera *camera, tin_transform *transform)
+camera_transform(const Camera *camera, Tin_Transform *transform)
 {
 	transform->translation = camera->position;
 	transform->rotation    = camera->quat;

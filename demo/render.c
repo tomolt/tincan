@@ -182,7 +182,7 @@ render_deinit(void)
 }
 
 Model
-render_make_model(int nverts, const tin_vec3 *verts, int nindices, const GLushort *indices)
+render_make_model(int nverts, const Tin_Vec3 *verts, int nindices, const GLushort *indices)
 {
 	Model model = {
 		.base_index  = model_ibo_count,
@@ -192,8 +192,8 @@ render_make_model(int nverts, const tin_vec3 *verts, int nindices, const GLushor
 
 	glBindBuffer(GL_ARRAY_BUFFER, model_vbo);
 	glBufferSubData(GL_ARRAY_BUFFER,
-		model_vbo_count * sizeof (tin_vec3),
-		nverts * sizeof (tin_vec3), verts);
+		model_vbo_count * sizeof (Tin_Vec3),
+		nverts * sizeof (Tin_Vec3), verts);
 	model_vbo_count += nverts;
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model_ibo);
@@ -213,12 +213,12 @@ render_start_models(void)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model_ibo);
 	glEnable(GL_DEPTH_TEST);
 
-	tin_vec3 light_dir = tin_normalize_v3((tin_vec3) {{ -0.3f, -0.6f, 0.0f }});
+	Tin_Vec3 light_dir = tin_normalize_v3((Tin_Vec3) {{ -0.3f, -0.6f, 0.0f }});
 	glUniform3fv(model_uniforms[3], 1, light_dir.c);
 }
 
 void
-render_draw_model(const Model *model, const tin_transform *transform, tin_vec3 color)
+render_draw_model(const Model *model, const Tin_Transform *transform, Tin_Vec3 color)
 {
 	Mat4 model_matrix = mat4_from_transform(transform);
 	Mat4 model_view_matrix = mat4_multiply(render_view_matrix, model_matrix);
@@ -244,16 +244,16 @@ render_start_overlay(void)
 }
 
 void
-render_push_vertex(tin_vec3 v)
+render_push_vertex(Tin_Vec3 v)
 {
 	glBufferSubData(GL_ARRAY_BUFFER,
-		(overlay_vbo_start + overlay_vbo_count) * sizeof (tin_vec3),
-		sizeof (tin_vec3), v.c);
+		(overlay_vbo_start + overlay_vbo_count) * sizeof (Tin_Vec3),
+		sizeof (Tin_Vec3), v.c);
 	overlay_vbo_count++;
 }
 
 void
-render_draw_lines(tin_vec3 color)
+render_draw_lines(Tin_Vec3 color)
 {
 	glUniformMatrix4fv(overlay_uniforms[0], 1, GL_FALSE, render_view_matrix.c);
 	glUniformMatrix4fv(overlay_uniforms[1], 1, GL_FALSE, render_proj_matrix.c);

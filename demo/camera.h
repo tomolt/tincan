@@ -1,7 +1,7 @@
 typedef struct {
-	tin_quat quat;
+	Tin_Quat quat;
 
-	tin_vec3 position;
+	Tin_Vec3 position;
 	float    yaw;
 	float    pitch;
 	
@@ -11,5 +11,5 @@ typedef struct {
 } Camera;
 
 void camera_update(Camera *camera, float inv_dt);
-void camera_transform(const Camera *camera, tin_transform *transform);
+void camera_transform(const Camera *camera, Tin_Transform *transform);
 
