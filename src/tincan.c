@@ -633,7 +633,7 @@ tin_broadphase(tin_scene *scene, void (*func)(tin_scene *, tin_body *, tin_body 
 {
 	TIN_FOR_EACH(body1, scene->bodies, tin_body, node) {
 		const tin_polytope *polytope1 = body1->shape_params;
-		TIN_FOR_EACH(body2, body1->node, tin_body, node) {
+		TIN_FOR_RANGE(body2, body1->node, scene->bodies, tin_body, node) {
 			const tin_polytope *polytope2 = body2->shape_params;
 			tin_vec3 diff = tin_sub_v3(body2->transform.translation, body1->transform.translation);
 			tin_scalar radii =
@@ -666,8 +666,8 @@ tin_body *
 tin_add_body(tin_scene *scene)
 {
 	tin_body *body = calloc(1, sizeof (tin_body));
-	TIN_LIST_LINK(body->node, scene->bodies);
 	TIN_LIST_LINK(*scene->bodies.prev, body->node);
+	TIN_LIST_LINK(body->node, scene->bodies);
 	return body;
 }
 
@@ -675,8 +675,8 @@ tin_arbiter *
 tin_add_arbiter(tin_scene *scene)
 {
 	tin_arbiter *arbiter = calloc(1, sizeof (tin_arbiter));
-	TIN_LIST_LINK(arbiter->node, scene->arbiters);
 	TIN_LIST_LINK(*scene->arbiters.prev, arbiter->node);
+	TIN_LIST_LINK(arbiter->node, scene->arbiters);
 	return arbiter;
 }
 
