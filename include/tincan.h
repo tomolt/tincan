@@ -90,10 +90,10 @@ Tin_Vec3 tin_bwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
 typedef struct {
 	Tin_List      node;
 	Tin_Transform transform;
-	const void   *shape_params;
+	const void   *shapeParams;
 	int           shape;
-	Tin_Scalar    inv_mass;
-	Tin_Vec3      inv_inertia;
+	Tin_Scalar    invMass;
+	Tin_Vec3      invInertia;
 	Tin_Vec3      velocity;
 	Tin_Vec3      angular_velocity;
 } Tin_Body;
@@ -102,7 +102,7 @@ typedef struct {
 
 typedef struct {
 	Tin_Vec3  *vertices;
-	int        num_vertices;
+	int        numVertices;
 	Tin_Scalar radius;
 } Tin_Polytope;
 
@@ -110,17 +110,17 @@ Tin_Vec3 tin_polytope_support(const Tin_Polytope *polytope, Tin_Vec3 dir);
 
 /* Minkowski sum (difference) of transformed convex polytopes */
 typedef struct {
-	const Tin_Polytope  *former_polytope;
-	const Tin_Transform *former_transform;
-	const Tin_Polytope  *latter_polytope;
-	const Tin_Transform *latter_transform;
+	const Tin_Polytope  *polytope1;
+	const Tin_Transform *transform1;
+	const Tin_Polytope  *polytope2;
+	const Tin_Transform *transform2;
 } Tin_Polysum;
 
 /* A point in a polytope sum */
 typedef struct {
 	Tin_Vec3 abs;
-	Tin_Vec3 rel_former;
-	Tin_Vec3 rel_latter;
+	Tin_Vec3 relTo1;
+	Tin_Vec3 relTo2;
 } Tin_Pspoint;
 
 void tin_polysum_support(const Tin_Polysum *s, Tin_Vec3 dir, Tin_Pspoint *sup);
@@ -146,12 +146,12 @@ typedef struct {
 	Tin_Vec3   rel1;
 	Tin_Vec3   rel2;
 	Tin_Vec3   normal;
-	Tin_Scalar base_stretch;
+	Tin_Scalar baseStretch;
 
 	Tin_Vec3   position;
 	Tin_Scalar separation;
 	
-	Tin_Scalar normal_mass;
+	Tin_Scalar normalMass;
 	Tin_Scalar bias;
 } Tin_Contact;
 
@@ -166,15 +166,15 @@ typedef struct {
 	Tin_List node;
 	Tin_Body *body1;
 	Tin_Body *body2;
-	int num_contacts;
+	int numContacts;
 	Tin_Contact contacts[TIN_MAX_CONTACTS];
 } Tin_Arbiter;
 
 Tin_Vec3 tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec);
 void tin_arbiter_update(Tin_Arbiter *arbiter);
 void tin_arbiter_add_contact(Tin_Arbiter *arbiter, Tin_Contact contact);
-void tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar inv_dt);
-void tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar inv_dt);
+void tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt);
+void tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt);
 
 typedef struct {
 	Tin_List bodies;

@@ -59,7 +59,7 @@ init_cone(int tessel)
 	}
 
 	cone_polytope.vertices     = verts;
-	cone_polytope.num_vertices = nverts;
+	cone_polytope.numVertices = nverts;
 	cone_polytope.radius       = 1.5f;
 
 	cone_model = render_make_model(nverts, verts, nindices, indices);
@@ -89,7 +89,7 @@ init_cube(void)
 		1, 3, 5, 3, 5, 7,
 	};
 	cube_polytope.vertices = verts;
-	cube_polytope.num_vertices = 8;
+	cube_polytope.numVertices = 8;
 	cube_polytope.radius = sqrtf(3.0f);
 	cube_model = render_make_model(8, verts, 6 * 6, indices);
 }
@@ -344,7 +344,7 @@ main(void)
 		for (int a = 0; a < num_objects; a++) {
 			for (int b = a + 1; b < num_objects; b++) {
 				Tin_Arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-				for (int i = 0; i < arbiter->num_contacts; i++) {
+				for (int i = 0; i < arbiter->numContacts; i++) {
 					const Tin_Contact *c = &arbiter->contacts[i];
 					Tin_Vec3 color = {{ 0.0f, 1.0f, 1.0f }};
 					Tin_Transform trf = ident;
@@ -361,16 +361,16 @@ main(void)
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
 			Tin_Polytope dot;
-			dot.num_vertices = 1;
+			dot.numVertices = 1;
 			dot.vertices = malloc(1 * sizeof *dot.vertices);
 			dot.vertices[0] = (Tin_Vec3) {{ 0.0f, 0.0f, 0.0f }};
 			/* ray picking */
 #if 0
 			Tin_Polysum sum;
-			sum.former_polytope = obj->body.shape_params;
-			sum.former_transform = &obj->body.transform;
-			sum.latter_polytope = &dot;
-			sum.latter_transform = &ident;
+			sum.polytope1 = obj->body.shapeParams;
+			sum.transform1 = &obj->body.transform;
+			sum.polytope2 = &dot;
+			sum.transform2 = &ident;
 			Tin_Ray ray = { .origin = camtrf.translation, .dir = tin_apply_qt(camtrf.rotation, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }}) };
 			Tin_Portal temp_portal;
 			if (tin_construct_portal(&sum, &ray, &temp_portal)) {

@@ -10,6 +10,6 @@ typedef struct {
 	double   cursor_y;
 } Camera;
 
-void camera_update(Camera *camera, float inv_dt);
+void camera_update(Camera *camera, float invDt);
 void camera_transform(const Camera *camera, Tin_Transform *transform);
 

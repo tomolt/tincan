@@ -7,7 +7,7 @@
 #define CAMERA_VELOCITY 3.0
 
 void
-camera_update(Camera *camera, float inv_dt)
+camera_update(Camera *camera, float invDt)
 {
 	camera->quat = tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, camera->yaw);
 	camera->quat = tin_mul_qt(camera->quat, tin_make_qt((Tin_Vec3) {{ 1.0f, 0.0f, 0.0f }}, camera->pitch));
@@ -19,7 +19,7 @@ camera_update(Camera *camera, float inv_dt)
 	if (camera->l) lr += 1.0f;
 	float norm = sqrtf(fb * fb + lr * lr);
 	if (norm) {
-		norm = (CAMERA_VELOCITY * inv_dt) / norm;
+		norm = (CAMERA_VELOCITY * invDt) / norm;
 	}
 	fb *= norm;
 	lr *= norm;
