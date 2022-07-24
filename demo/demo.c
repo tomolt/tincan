@@ -139,7 +139,7 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 	case GLFW_KEY_SPACE:
 		if (action == GLFW_PRESS) {
 			tin_vec3 forward = tin_apply_qt(camera.quat, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }});
-			tin_body *body = calloc(1, sizeof (tin_body));
+			tin_body *body = tin_add_body(&scene);
 			*body = (tin_body) {
 				{
 					camera.quat,
@@ -157,7 +157,6 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 				tin_scale_v3(25.0f, forward),
 				{{ 0.0f, 0.0f, 0.0f }},
 			};
-			*(tin_body **) tin_array_add(&scene.bodies) = body;
 			objects[num_objects++] = (Object) {
 				body,
 				&cube_model,
@@ -224,7 +223,7 @@ main(void)
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
 	camera.position.c[2] = 5.0f;
 
-	tin_body *body1 = calloc(1, sizeof (tin_body));
+	tin_body *body1 = tin_add_body(&scene);
 	*body1 = (tin_body) {
 		{
 			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
@@ -243,14 +242,13 @@ main(void)
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 	};
-	*(tin_body **) tin_array_add(&scene.bodies) = body1;
 	objects[num_objects++] = (Object) {
 		body1,
 		&cone_model,
 		{{ 0.5f, 1.0f, 0.5f }}
 	};
 
-	tin_body *body2 = calloc(1, sizeof (tin_body));
+	tin_body *body2 = tin_add_body(&scene);
 	*body2 = (tin_body) {
 		{
 			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
@@ -269,14 +267,13 @@ main(void)
 		{{ 0.0f, 0.0f, 0.0f }},
 		//{{ 0.1f, 0.1f, 0.0f }},
 	};
-	*(tin_body **) tin_array_add(&scene.bodies) = body2;
 	objects[num_objects++] = (Object) {
 		body2,
 		&cube_model,
 		{{ 1.0f, 0.5f, 0.5f }}
 	};
 
-	tin_body *body3 = calloc(1, sizeof (tin_body));
+	tin_body *body3 = tin_add_body(&scene);
 	*body3 = (tin_body) {
 		{
 			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
@@ -290,7 +287,6 @@ main(void)
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 	};
-	*(tin_body **) tin_array_add(&scene.bodies) = body3;
 	objects[num_objects++] = (Object) {
 		body3,
 		&cube_model,
