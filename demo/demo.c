@@ -199,6 +199,19 @@ mouse_callback(GLFWwindow *window, double x, double y)
         camera.cursor_y = y;
 }
 
+void *
+custom_alloc(void *userPointer)
+{
+	return malloc((size_t) userPointer);
+}
+
+void
+custom_free(void *userPointer, void *memoryPointer)
+{
+	(void) userPointer;
+	free(memoryPointer);
+}
+
 int
 main(void)
 {
@@ -226,6 +239,8 @@ main(void)
 
 	TIN_LIST_INIT(scene.bodies);
 	TIN_LIST_INIT(scene.arbiters);
+	scene.bodyAllocator = (tin_allocator) { (void *) sizeof (tin_body), custom_alloc, custom_free };
+	scene.arbiterAllocator = (tin_allocator) { (void *) sizeof (tin_arbiter), custom_alloc, custom_free };
 
 	tin_body *body1 = tin_add_body(&scene);
 	*body1 = (tin_body) {

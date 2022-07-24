@@ -25,6 +25,14 @@ struct tin_list {
 	     elem = TIN_CONTAINER_OF(_node = _node->next, type, member))
 #define TIN_FOR_EACH(elem, list, type, member) TIN_FOR_RANGE(elem, list, list, type, member)
 
+/* Customizable Allocators */
+
+typedef struct {
+	void *userPointer;
+	void *(*alloc)(void *userPointer);
+	void (*free)(void *userPointer, void *memoryPointer);
+} tin_allocator;
+
 /* 3D Vectors */
 
 #define TIN_EPSILON FLT_EPSILON
@@ -171,6 +179,8 @@ void tin_arbiter_apply_impulse(tin_arbiter *arbiter, tin_scalar inv_dt);
 typedef struct {
 	tin_list bodies;
 	tin_list arbiters;
+	tin_allocator bodyAllocator;
+	tin_allocator arbiterAllocator;
 } tin_scene;
 
 tin_arbiter *tin_find_arbiter(tin_scene *scene, tin_body *body1, tin_body *body2);

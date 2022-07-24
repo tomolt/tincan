@@ -1,6 +1,6 @@
 #include "tincan.h"
 
-#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <math.h>
 
@@ -665,7 +665,8 @@ tin_simulate(tin_scene *scene, tin_scalar dt)
 tin_body *
 tin_add_body(tin_scene *scene)
 {
-	tin_body *body = calloc(1, sizeof (tin_body));
+	tin_body *body = scene->bodyAllocator.alloc(scene->bodyAllocator.userPointer);
+	memset(body, 0, sizeof *body);
 	TIN_LIST_LINK(*scene->bodies.prev, body->node);
 	TIN_LIST_LINK(body->node, scene->bodies);
 	return body;
@@ -674,7 +675,8 @@ tin_add_body(tin_scene *scene)
 tin_arbiter *
 tin_add_arbiter(tin_scene *scene)
 {
-	tin_arbiter *arbiter = calloc(1, sizeof (tin_arbiter));
+	tin_arbiter *arbiter = scene->arbiterAllocator.alloc(scene->arbiterAllocator.userPointer);
+	memset(arbiter, 0, sizeof *arbiter);
 	TIN_LIST_LINK(*scene->arbiters.prev, arbiter->node);
 	TIN_LIST_LINK(arbiter->node, scene->arbiters);
 	return arbiter;
