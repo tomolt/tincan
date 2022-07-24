@@ -141,6 +141,7 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 			tin_vec3 forward = tin_apply_qt(camera.quat, (tin_vec3) {{ 0.0f, 0.0f, -1.0f }});
 			tin_body *body = tin_add_body(&scene);
 			*body = (tin_body) {
+				{ 0 },
 				{
 					camera.quat,
 					camera.position,
@@ -223,8 +224,12 @@ main(void)
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
 	camera.position.c[2] = 5.0f;
 
+	TIN_LIST_INIT(scene.bodies);
+	TIN_LIST_INIT(scene.arbiters);
+
 	tin_body *body1 = tin_add_body(&scene);
 	*body1 = (tin_body) {
+		{ 0 },
 		{
 			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
 			(tin_vec3) {{ 0.0f, 0.0f, 0.0f }},
@@ -250,6 +255,7 @@ main(void)
 
 	tin_body *body2 = tin_add_body(&scene);
 	*body2 = (tin_body) {
+		{ 0 },
 		{
 			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
 			(tin_vec3) {{ 4.0f, 0.9f, -0.3f }},
@@ -275,6 +281,7 @@ main(void)
 
 	tin_body *body3 = tin_add_body(&scene);
 	*body3 = (tin_body) {
+		{ 0 },
 		{
 			tin_make_qt((tin_vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
 			(tin_vec3) {{ 0.0f, -23.0f, 0.0f }},
@@ -376,8 +383,6 @@ main(void)
 		glfwSwapBuffers(window);
 	}
 
-	free(scene.bodies);
-	free(scene.arbiters);
 	render_deinit();
 	glfwTerminate();
 	return 0;

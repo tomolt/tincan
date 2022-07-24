@@ -2,12 +2,32 @@
 #define TINCAN_PHYSICS_H
 
 #include <stdint.h>
+#include <stddef.h> /* for offsetof */
 #include <float.h>
+
+/* Linked List */
+
+typedef struct tin_list tin_list;
+
+struct tin_list {
+	tin_list *next;
+	tin_list *prev;
+};
+
+#define TIN_LIST_LINK(node1, node2) do { (node1).next = &(node2); (node2).prev = &(node1); } while (0)
+#define TIN_LIST_INIT(list) TIN_LIST_LINK(list, list)
+#define TIN_CONTAINER_OF(ptr, type, member) ((type *)((char *)(ptr) - offsetof(type, member)))
+#define TIN_FOR_EACH(elem, list, type, member)						\
+	type *elem;									\
+	tin_list *_node;								\
+	for (elem = TIN_CONTAINER_OF(_node = (list).next, type, member);		\
+	     _node != &(list);								\
+	     elem = TIN_CONTAINER_OF(_node = _node->next, type, member))
+
+/* 3D Vectors */
 
 #define TIN_EPSILON FLT_EPSILON
 typedef float tin_scalar;
-
-/* 3D Vectors */
 
 struct tin_vec3 { tin_scalar c[3]; };
 typedef struct tin_vec3 tin_vec3;
@@ -59,6 +79,7 @@ tin_vec3 tin_bwtrf_dir  (const tin_transform *transform, tin_vec3 vec);
 /* Rigid Bodies */
 
 typedef struct {
+	tin_list      node;
 	tin_transform transform;
 	const void   *shape_params;
 	int           shape;
@@ -133,6 +154,7 @@ int tin_polytope_collide(
 #define TIN_MAX_CONTACTS 5
 
 typedef struct {
+	tin_list node;
 	tin_body *body1;
 	tin_body *body2;
 	int num_contacts;
@@ -146,12 +168,8 @@ void tin_arbiter_prestep(tin_arbiter *arbiter, tin_scalar inv_dt);
 void tin_arbiter_apply_impulse(tin_arbiter *arbiter, tin_scalar inv_dt);
 
 typedef struct {
-	tin_body **bodies;
-	tin_arbiter **arbiters;
-	int bodyCount;
-	int bodyCapac;
-	int arbiterCount;
-	int arbiterCapac;
+	tin_list bodies;
+	tin_list arbiters;
 } tin_scene;
 
 tin_arbiter *tin_find_arbiter(tin_scene *scene, tin_body *body1, tin_body *body2);
