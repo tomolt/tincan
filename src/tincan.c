@@ -505,46 +505,46 @@ void
 tin_apply_impulse(Tin_Body *body, Tin_Vec3 impulse, Tin_Vec3 at)
 {
 	body->velocity = tin_add_v3(body->velocity, tin_scale_v3(body->invMass, impulse));
-	body->angular_velocity = tin_add_v3(body->angular_velocity,
+	body->angularVelocity = tin_add_v3(body->angularVelocity,
 		tin_solve_inertia(body, tin_cross_v3(at, impulse)));
 }
 
 void
 tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
-	for (int i = 0; i < arbiter->numContacts; i++) {
-		Tin_Contact *contact = &arbiter->contacts[i];
+	for (int idx = 0; idx < arbiter->numContacts; idx++) {
+		Tin_Contact *contact = &arbiter->contacts[idx];
 		if (contact->separation > 0.0f) continue;
 
-		Tin_Vec3 r1 = tin_sub_v3(contact->position, arbiter->body1->transform.translation);
-		Tin_Vec3 r2 = tin_sub_v3(contact->position, arbiter->body2->transform.translation);
+		Tin_Vec3 relTo1 = tin_sub_v3(contact->position, arbiter->body1->transform.translation);
+		Tin_Vec3 relTo2 = tin_sub_v3(contact->position, arbiter->body2->transform.translation);
 
 		/* Relative velocity at contact */
-		Tin_Vec3 v_rel = tin_sub_v3(
-			tin_add_v3(arbiter->body2->velocity, tin_cross_v3(arbiter->body2->angular_velocity, r2)),
-			tin_add_v3(arbiter->body1->velocity, tin_cross_v3(arbiter->body1->angular_velocity, r1)));
+		Tin_Vec3 relVelocity = tin_sub_v3(
+			tin_add_v3(arbiter->body2->velocity, tin_cross_v3(arbiter->body2->angularVelocity, relTo2)),
+			tin_add_v3(arbiter->body1->velocity, tin_cross_v3(arbiter->body1->angularVelocity, relTo1)));
 
 		/* Compute normal impulse */
-		Tin_Scalar magnitude = contact->normalMass * (-tin_dot_v3(v_rel, contact->normal) + contact->bias);
+		Tin_Scalar magnitude = contact->normalMass * (-tin_dot_v3(relVelocity, contact->normal) + contact->bias);
 		magnitude = MAX(magnitude, 0.0f);
 		Tin_Vec3 impulse = tin_scale_v3(magnitude, contact->normal);
 
 		/* Apply contact impulse */
-		tin_apply_impulse(arbiter->body1, tin_neg_v3(impulse), r1);
-		tin_apply_impulse(arbiter->body2, impulse, r2);
+		tin_apply_impulse(arbiter->body1, tin_neg_v3(impulse), relTo1);
+		tin_apply_impulse(arbiter->body2, impulse, relTo2);
 
 		/* Compute friction impulse */
 		Tin_Scalar friction_coefficient = 0.2f;
-		Tin_Vec3 friction = tin_gram_schmidt(contact->normal, v_rel);
+		Tin_Vec3 friction = tin_gram_schmidt(contact->normal, relVelocity);
 		if (tin_dot_v3(friction, friction) <= 10.0f * TIN_EPSILON) {
 			friction_coefficient *= 2.0f;
 		}
 		friction = tin_scale_v3(-friction_coefficient / invDt, friction);
 		if (arbiter->body1->invMass > 0.0f) {
-			tin_apply_impulse(arbiter->body1, tin_scale_v3(-1.0f / arbiter->body1->invMass, friction), r1);
+			tin_apply_impulse(arbiter->body1, tin_scale_v3(-1.0f / arbiter->body1->invMass, friction), relTo1);
 		}
 		if (arbiter->body2->invMass > 0.0f) {
-			tin_apply_impulse(arbiter->body2, tin_scale_v3(1.0f / arbiter->body2->invMass, friction), r2);
+			tin_apply_impulse(arbiter->body2, tin_scale_v3(1.0f / arbiter->body2->invMass, friction), relTo2);
 		}
 	}
 }
@@ -614,12 +614,11 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 			body->transform.translation = tin_saxpy_v3(dt, body->velocity, body->transform.translation);
 		}
 		
-		Tin_Vec3 av = body->angular_velocity;
-		Tin_Scalar angle = sqrtf(tin_dot_v3(av, av));
+		Tin_Scalar angle = sqrtf(tin_dot_v3(body->angularVelocity, body->angularVelocity));
 		
 		if (fabs(angle) > 100.0f * TIN_EPSILON) {
 			body->transform.rotation = tin_mul_qt(
-				tin_make_qt(tin_normalize_v3(av), angle * dt), body->transform.rotation);
+				tin_make_qt(tin_normalize_v3(body->angularVelocity), angle * dt), body->transform.rotation);
 		}
 
 		if (body->invMass != 0.0f) {

@@ -95,7 +95,7 @@ typedef struct {
 	Tin_Scalar    invMass;
 	Tin_Vec3      invInertia;
 	Tin_Vec3      velocity;
-	Tin_Vec3      angular_velocity;
+	Tin_Vec3      angularVelocity;
 } Tin_Body;
 
 /* Polytopes */
