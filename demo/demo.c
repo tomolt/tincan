@@ -62,6 +62,12 @@ init_cone(int tessel)
 	cone_shape.polytope.vertices = verts;
 	cone_shape.polytope.numVertices = nverts;
 	cone_shape.radius = 1.5f;
+	Tin_Scalar r = 1.0f, h = 2.0f;
+	cone_shape.invInertia = (Tin_Vec3) {{
+		1.0 / (3.0 / 80.0 * (h * h + 4.0 * r * r)),
+		1.0 / (3.0 / 10.0),
+		1.0 / (3.0 / 80.0 * (h * h + 4.0 * r * r)),
+	}};
 
 	cone_model = render_make_model(nverts, verts, nindices, indices);
 	
@@ -94,6 +100,7 @@ init_cube(void)
 	cube_shape.polytope.vertices = verts;
 	cube_shape.polytope.numVertices = 8;
 	cube_shape.radius = sqrtf(3.0f);
+	cube_shape.invInertia = (Tin_Vec3) {{ 6.0f, 6.0f, 6.0f }};
 	
 	cube_model = render_make_model(8, verts, 6 * 6, indices);
 }
@@ -152,13 +159,8 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 					0.2f,
 				},
 				&cube_shape,
-				1.0f / 0.5f,
-				{{
-					 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
-					 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
-					 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
-				}},
-				tin_scale_v3(25.0f, forward),
+				1.0f / 0.25f,
+				tin_scale_v3(15.0f, forward),
 				{{ 0.0f, 0.0f, 0.0f }},
 			};
 			objects[num_objects++] = (Object) {
@@ -255,11 +257,6 @@ main(void)
 		},
 		&cone_shape,
 		1.0f / 1.0f,
-		{{
-			1.0f / (1.0f * 3.0f * ((1.0f * 1.0f) / 20.0f + (2.0f * 2.0f) / 80.0f)),
-			1.0f / (1.0f * 3.0f / 10.0f * (1.0f * 1.0f)),
-			1.0f / (1.0f * 3.0f * ((1.0f * 1.0f) / 20.0f + (2.0f * 2.0f) / 80.0f)),
-		}},
 		//{{ 0.0f, 0.0f, -0.5f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
@@ -280,11 +277,6 @@ main(void)
 		},
 		&cube_shape,
 		1.0f / 3.0f,
-		{{
-			 1.0f / (2.0f / 3.0f * 3.0f),
-			 1.0f / (2.0f / 3.0f * 3.0f),
-			 1.0f / (2.0f / 3.0f * 3.0f),
-		}},
 		{{ -5.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 		//{{ 0.1f, 0.1f, 0.0f }},
@@ -305,7 +297,6 @@ main(void)
 		},
 		&cube_shape,
 		0.0f,
-		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 	};

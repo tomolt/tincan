@@ -408,7 +408,7 @@ Tin_Vec3
 tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec)
 {
 	vec = tin_bwtrf_dir(&body->transform, vec);
-	vec = tin_hadamard_v3(body->invInertia, vec);
+	vec = tin_hadamard_v3(tin_scale_v3(body->invMass / (body->transform.scale * body->transform.scale), body->shape->invInertia), vec);
 	vec = tin_fwtrf_dir(&body->transform, vec);
 	return vec;
 }

@@ -95,6 +95,7 @@ Tin_Vec3 tin_polytope_support(const Tin_Polytope *polytope, Tin_Vec3 dir);
 #define TIN_POLYTOPE 'p'
 
 typedef struct {
+	Tin_Vec3   invInertia;
 	Tin_Scalar radius;
 	int        kind;
 	union {
@@ -109,7 +110,6 @@ typedef struct {
 	Tin_Transform transform;
 	const Tin_Shape *shape;
 	Tin_Scalar    invMass;
-	Tin_Vec3      invInertia;
 	Tin_Vec3      velocity;
 	Tin_Vec3      angularVelocity;
 } Tin_Body;
