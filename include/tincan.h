@@ -80,33 +80,39 @@ Tin_Vec3 tin_fwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
 Tin_Vec3 tin_bwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec);
 Tin_Vec3 tin_bwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
 
+/* Polytopes */
+
+typedef struct {
+	Tin_Vec3  *vertices;
+	int        numVertices;
+} Tin_Polytope;
+
+Tin_Vec3 tin_polytope_support(const Tin_Polytope *polytope, Tin_Vec3 dir);
+
 /* Shapes */
 
-#define TIN_SPHERE 's'
-#define TIN_CONVEX 'c'
+#define TIN_SPHERE   's'
+#define TIN_POLYTOPE 'p'
+
+typedef struct {
+	Tin_Scalar radius;
+	int        kind;
+	union {
+		Tin_Polytope polytope;
+	};
+} Tin_Shape;
 
 /* Rigid Bodies */
 
 typedef struct {
 	Tin_List      node;
 	Tin_Transform transform;
-	const void   *shapeParams;
-	int           shape;
+	const Tin_Shape *shape;
 	Tin_Scalar    invMass;
 	Tin_Vec3      invInertia;
 	Tin_Vec3      velocity;
 	Tin_Vec3      angularVelocity;
 } Tin_Body;
-
-/* Polytopes */
-
-typedef struct {
-	Tin_Vec3  *vertices;
-	int        numVertices;
-	Tin_Scalar radius;
-} Tin_Polytope;
-
-Tin_Vec3 tin_polytope_support(const Tin_Polytope *polytope, Tin_Vec3 dir);
 
 /* Minkowski sum (difference) of transformed convex polytopes */
 typedef struct {

@@ -26,10 +26,10 @@ static Camera camera;
 static Object objects[MAX_OBJECTS];
 static int    num_objects;
 
-static Tin_Polytope cone_polytope;
-static Model        cone_model;
-static Tin_Polytope cube_polytope;
-static Model        cube_model;
+static Tin_Shape cone_shape;
+static Model     cone_model;
+static Tin_Shape cube_shape;
+static Model     cube_model;
 
 static float time_multiplier = 1.0f;
 
@@ -58,9 +58,10 @@ init_cone(int tessel)
 		indices[6*v+5] = tessel + 1;
 	}
 
-	cone_polytope.vertices     = verts;
-	cone_polytope.numVertices = nverts;
-	cone_polytope.radius       = 1.5f;
+	cone_shape.kind = TIN_POLYTOPE;
+	cone_shape.polytope.vertices = verts;
+	cone_shape.polytope.numVertices = nverts;
+	cone_shape.radius = 1.5f;
 
 	cone_model = render_make_model(nverts, verts, nindices, indices);
 	
@@ -88,9 +89,12 @@ init_cube(void)
 		0, 2, 4, 2, 4, 6,
 		1, 3, 5, 3, 5, 7,
 	};
-	cube_polytope.vertices = verts;
-	cube_polytope.numVertices = 8;
-	cube_polytope.radius = sqrtf(3.0f);
+
+	cube_shape.kind = TIN_POLYTOPE;
+	cube_shape.polytope.vertices = verts;
+	cube_shape.polytope.numVertices = 8;
+	cube_shape.radius = sqrtf(3.0f);
+	
 	cube_model = render_make_model(8, verts, 6 * 6, indices);
 }
 
@@ -147,8 +151,7 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 					camera.position,
 					0.2f,
 				},
-				&cube_polytope,
-				TIN_CONVEX,
+				&cube_shape,
 				1.0f / 0.5f,
 				{{
 					 1.0f / (1.0f / 6.0f * 0.5f * 0.2f * 0.2f),
@@ -250,8 +253,7 @@ main(void)
 			(Tin_Vec3) {{ 0.0f, 0.0f, 0.0f }},
 			1.0f
 		},
-		&cone_polytope,
-		TIN_CONVEX,
+		&cone_shape,
 		1.0f / 1.0f,
 		{{
 			1.0f / (1.0f * 3.0f * ((1.0f * 1.0f) / 20.0f + (2.0f * 2.0f) / 80.0f)),
@@ -276,8 +278,7 @@ main(void)
 			(Tin_Vec3) {{ 4.0f, 0.9f, -0.3f }},
 			1.0f
 		},
-		&cube_polytope,
-		TIN_CONVEX,
+		&cube_shape,
 		1.0f / 3.0f,
 		{{
 			 1.0f / (2.0f / 3.0f * 3.0f),
@@ -302,8 +303,7 @@ main(void)
 			(Tin_Vec3) {{ 0.0f, -23.0f, 0.0f }},
 			20.0f
 		},
-		&cube_polytope,
-		TIN_CONVEX,
+		&cube_shape,
 		0.0f,
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
@@ -364,10 +364,10 @@ main(void)
 			dot.numVertices = 1;
 			dot.vertices = malloc(1 * sizeof *dot.vertices);
 			dot.vertices[0] = (Tin_Vec3) {{ 0.0f, 0.0f, 0.0f }};
-			/* ray picking */
+			/* ray picking (outdated code) */
 #if 0
 			Tin_Polysum sum;
-			sum.polytope1 = obj->body.shapeParams;
+			sum.polytope1 = obj->body->shape->polytope;
 			sum.transform1 = &obj->body.transform;
 			sum.polytope2 = &dot;
 			sum.transform2 = &ident;

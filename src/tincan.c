@@ -579,8 +579,8 @@ tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2)
 
 	Tin_Contact contact;
 	int colliding = tin_polytope_collide(
-			body1->shapeParams, &body1->transform,
-			body2->shapeParams, &body2->transform, &contact);
+			&body1->shape->polytope, &body1->transform,
+			&body2->shape->polytope, &body2->transform, &contact);
 
 	if (colliding) {
 		printf("D %f\n", tin_dot_v3(contact.normal,
@@ -631,13 +631,11 @@ void
 tin_broadphase(Tin_Scene *scene, void (*func)(Tin_Scene *, Tin_Body *, Tin_Body *))
 {
 	TIN_FOR_EACH(body1, scene->bodies, Tin_Body, node) {
-		const Tin_Polytope *polytope1 = body1->shapeParams;
 		TIN_FOR_RANGE(body2, body1->node, scene->bodies, Tin_Body, node) {
-			const Tin_Polytope *polytope2 = body2->shapeParams;
 			Tin_Vec3 diff = tin_sub_v3(body2->transform.translation, body1->transform.translation);
 			Tin_Scalar radii =
-				polytope2->radius * body2->transform.scale +
-				polytope1->radius * body1->transform.scale;
+				body2->shape->radius * body2->transform.scale +
+				body1->shape->radius * body1->transform.scale;
 			if (tin_dot_v3(diff, diff) <= radii * radii) {
 				func(scene, body1, body2);
 			}
