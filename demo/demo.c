@@ -105,6 +105,8 @@ init_cube(void)
 	cube_model = render_make_model(8, verts, 6 * 6, indices);
 }
 
+static Camera *cam = &camera;
+
 static void
 key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
@@ -119,17 +121,17 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 		}
 		break;
 
-	case GLFW_KEY_W: camera.f = action == GLFW_PRESS; break;
-	case GLFW_KEY_A: camera.l = action == GLFW_PRESS; break;
-	case GLFW_KEY_S: camera.b = action == GLFW_PRESS; break;
-	case GLFW_KEY_D: camera.r = action == GLFW_PRESS; break;
+	case GLFW_KEY_W: cam->f = action == GLFW_PRESS; break;
+	case GLFW_KEY_A: cam->l = action == GLFW_PRESS; break;
+	case GLFW_KEY_S: cam->b = action == GLFW_PRESS; break;
+	case GLFW_KEY_D: cam->r = action == GLFW_PRESS; break;
 	
 	case GLFW_KEY_E:
 		if (action == GLFW_RELEASE) {
 			int mode = glfwGetInputMode(window, GLFW_CURSOR);
 			if (mode == GLFW_CURSOR_NORMAL) {
 				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-				glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
+				glfwGetCursorPos(window, &cam->cursor_x, &cam->cursor_y);
 			} else {
 				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 			}
@@ -149,18 +151,18 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 
 	case GLFW_KEY_SPACE:
 		if (action == GLFW_PRESS) {
-			Tin_Vec3 forward = tin_apply_qt(camera.quat, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }});
+			Tin_Vec3 forward = tin_apply_qt(cam->quat, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }});
 			Tin_Body *body = tin_add_body(&scene);
 			*body = (Tin_Body) {
 				body->node,
 				{
-					camera.quat,
-					camera.position,
+					cam->quat,
+					tin_saxpy_v3(1.0f, forward, cam->position),
 					0.2f,
 				},
 				&cube_shape,
-				1.0f / 0.25f,
-				tin_scale_v3(15.0f, forward),
+				1.0f / 1.0f,
+				tin_scale_v3(5.0f, forward),
 				{{ 0.0f, 0.0f, 0.0f }},
 			};
 			objects[num_objects++] = (Object) {
@@ -181,27 +183,27 @@ mouse_callback(GLFWwindow *window, double x, double y)
 	int mode = glfwGetInputMode(window, GLFW_CURSOR);
 	if (mode != GLFW_CURSOR_DISABLED) return;
 
-        float dx = x - camera.cursor_x;
-        float dy = y - camera.cursor_y;
+        float dx = x - cam->cursor_x;
+        float dy = y - cam->cursor_y;
 
-        camera.yaw -= dx * 0.001f;
-        while (camera.yaw < 0.0f) {
-                camera.yaw += 2.0f * M_PI;
+        cam->yaw -= dx * 0.001f;
+        while (cam->yaw < 0.0f) {
+                cam->yaw += 2.0f * M_PI;
         }
-        while (camera.yaw >= 2.0f * M_PI) {
-                camera.yaw -= 2.0f * M_PI;
-        }
-
-        camera.pitch -= dy * 0.001f;
-        if (camera.pitch < -0.5f * M_PI) {
-                camera.pitch = -0.5f * M_PI;
-        }
-        if (camera.pitch > 0.5f * M_PI) {
-                camera.pitch = 0.5f * M_PI;
+        while (cam->yaw >= 2.0f * M_PI) {
+                cam->yaw -= 2.0f * M_PI;
         }
 
-        camera.cursor_x = x;
-        camera.cursor_y = y;
+        cam->pitch -= dy * 0.001f;
+        if (cam->pitch < -0.5f * M_PI) {
+                cam->pitch = -0.5f * M_PI;
+        }
+        if (cam->pitch > 0.5f * M_PI) {
+                cam->pitch = 0.5f * M_PI;
+        }
+
+        cam->cursor_x = x;
+        cam->cursor_y = y;
 }
 
 void *

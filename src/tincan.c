@@ -622,7 +622,7 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 		}
 
 		if (body->invMass != 0.0f) {
-			body->velocity = tin_saxpy_v3(dt, (Tin_Vec3) {{ 0.0f, -6.0f, 0.0f }}, body->velocity);
+			body->velocity = tin_saxpy_v3(dt, (Tin_Vec3) {{ 0.0f, -2.0f, 0.0f }}, body->velocity);
 		}
 	}
 }
