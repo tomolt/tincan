@@ -549,6 +549,16 @@ tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	}
 }
 
+void
+tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
+{
+	Tin_Vec3 pos1 = tin_fwtrf_point(&joint->body1->transform, joint->relTo1);
+	Tin_Vec3 pos2 = tin_fwtrf_point(&joint->body2->transform, joint->relTo2);
+	Tin_Vec3 difference = tin_sub_v3(pos1, pos2);
+	tin_apply_impulse(joint->body1, tin_scale_v3(-1.0f / invDt, difference), pos1);
+	tin_apply_impulse(joint->body2, tin_scale_v3( 1.0f / invDt, difference), pos2);
+}
+
 Tin_Arbiter *
 tin_find_arbiter(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2)
 {

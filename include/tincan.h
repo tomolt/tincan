@@ -183,10 +183,22 @@ void tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt);
 void tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt);
 
 typedef struct {
+	Tin_List node;
+	Tin_Body *body1;
+	Tin_Body *body2;
+	Tin_Vec3 relTo1;
+	Tin_Vec3 relTo2;
+} Tin_Joint;
+
+void tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt);
+
+typedef struct {
 	Tin_List bodies;
 	Tin_List arbiters;
+	Tin_List joints;
 	Tin_Allocator bodyAllocator;
 	Tin_Allocator arbiterAllocator;
+	Tin_Allocator jointAllocator;
 } Tin_Scene;
 
 Tin_Arbiter *tin_find_arbiter(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2);
