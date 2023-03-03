@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <math.h>
 
+#include <stdlib.h> // abort()
+
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
@@ -504,6 +506,7 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 void
 tin_apply_impulse(Tin_Body *body, Tin_Vec3 impulse, Tin_Vec3 at)
 {
+	if (tin_length_v3(impulse) > 1e10) abort();
 	body->velocity = tin_add_v3(body->velocity, tin_scale_v3(body->invMass, impulse));
 	body->angularVelocity = tin_add_v3(body->angularVelocity,
 		tin_solve_inertia(body, tin_cross_v3(at, impulse)));
@@ -561,17 +564,26 @@ tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 	Tin_Vec3 r2 = tin_sub_v3(pos2, joint->body2->transform.translation);
 
 	Tin_Vec3 difference = tin_sub_v3(joint->body2->velocity, joint->body1->velocity);
+	printf("|V2-V1| = %f\n", tin_length_v3(difference));
 	Tin_Vec3 direction = tin_normalize_v3(difference);
-	//Tin_Scalar bias = -biasFactor * invDt * tin_dot_v3(direction, tin_sub_v3(pos2, pos1));
 	Tin_Scalar bias = 0.0f;
-	Tin_Scalar magnitude = (-tin_dot_v3(difference, difference) + bias) / (joint->body1->invMass + joint->body2->invMass + tin_dot_v3(direction, tin_add_v3(
+	if (tin_dot_v3(difference, difference) >= 0.00001f) {
+		bias = -biasFactor * invDt * tin_dot_v3(difference, tin_sub_v3(pos2, pos1)) / tin_dot_v3(difference, difference);
+	}
+	Tin_Scalar magnitude = (-1.0f + bias) / (joint->body1->invMass + joint->body2->invMass + tin_dot_v3(direction, tin_add_v3(
 		tin_cross_v3(tin_solve_inertia(joint->body1, tin_cross_v3(r1, direction)), r1),
 		tin_cross_v3(tin_solve_inertia(joint->body2, tin_cross_v3(r2, direction)), r2))));
 
-	joint->debugImpulse = tin_scale_v3(magnitude, direction);
+	Tin_Vec3 impulse = tin_scale_v3(magnitude, difference);
+	joint->debugImpulse = impulse;
 
-	tin_apply_impulse(joint->body1, tin_scale_v3(-magnitude, direction), pos1);
-	tin_apply_impulse(joint->body2, tin_scale_v3( magnitude, direction), pos2);
+	tin_apply_impulse(joint->body1, tin_neg_v3(impulse), pos1);
+	tin_apply_impulse(joint->body2, impulse, pos2);
+
+	/*Tin_Vec3 newDifference = tin_sub_v3(joint->body2->velocity, joint->body1->velocity);
+	if (tin_length_v3(newDifference) > 2.0f * tin_length_v3(difference)) {
+		abort();
+	}*/
 }
 
 Tin_Arbiter *
@@ -608,8 +620,8 @@ tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2)
 			&body2->shape->polytope, &body2->transform, &contact);
 
 	if (colliding) {
-		printf("D %f\n", tin_dot_v3(contact.normal,
-					tin_sub_v3(body2->transform.translation, body1->transform.translation)));
+		/*printf("D %f\n", tin_dot_v3(contact.normal,
+					tin_sub_v3(body2->transform.translation, body1->transform.translation)));*/
 		tin_arbiter_add_contact(arbiter, contact);
 	}
 }
