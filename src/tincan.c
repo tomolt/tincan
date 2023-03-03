@@ -552,20 +552,26 @@ tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 void
 tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 {
+	const Tin_Scalar biasFactor = 0.1f;
+
 	Tin_Vec3 pos1 = tin_fwtrf_point(&joint->body1->transform, joint->relTo1);
 	Tin_Vec3 pos2 = tin_fwtrf_point(&joint->body2->transform, joint->relTo2);
 
 	Tin_Vec3 r1 = tin_sub_v3(pos1, joint->body1->transform.translation);
 	Tin_Vec3 r2 = tin_sub_v3(pos2, joint->body2->transform.translation);
 
-	Tin_Vec3 direction = tin_normalize_v3(tin_sub_v3(joint->body2->velocity, joint->body1->velocity));
-	Tin_Scalar magnitude = 1.0f / (joint->body1->invMass + joint->body2->invMass + tin_dot_v3(direction, tin_add_v3(
+	Tin_Vec3 difference = tin_sub_v3(joint->body2->velocity, joint->body1->velocity);
+	Tin_Vec3 direction = tin_normalize_v3(difference);
+	//Tin_Scalar bias = -biasFactor * invDt * tin_dot_v3(direction, tin_sub_v3(pos2, pos1));
+	Tin_Scalar bias = 0.0f;
+	Tin_Scalar magnitude = (-tin_dot_v3(difference, difference) + bias) / (joint->body1->invMass + joint->body2->invMass + tin_dot_v3(direction, tin_add_v3(
 		tin_cross_v3(tin_solve_inertia(joint->body1, tin_cross_v3(r1, direction)), r1),
 		tin_cross_v3(tin_solve_inertia(joint->body2, tin_cross_v3(r2, direction)), r2))));
-	//Tin_Scalar bias = ;
 
-	tin_apply_impulse(joint->body1, tin_scale_v3(-magnitude / invDt, direction), pos1);
-	tin_apply_impulse(joint->body2, tin_scale_v3( magnitude / invDt, direction), pos2);
+	joint->debugImpulse = tin_scale_v3(magnitude, direction);
+
+	tin_apply_impulse(joint->body1, tin_scale_v3(-magnitude, direction), pos1);
+	tin_apply_impulse(joint->body2, tin_scale_v3( magnitude, direction), pos2);
 }
 
 Tin_Arbiter *
@@ -620,8 +626,15 @@ tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt)
 void
 tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt)
 {
-	TIN_FOR_EACH(arbiter, scene->arbiters, Tin_Arbiter, node) {
-		tin_arbiter_apply_impulse(arbiter, invDt);
+	{
+		TIN_FOR_EACH(arbiter, scene->arbiters, Tin_Arbiter, node) {
+			tin_arbiter_apply_impulse(arbiter, invDt);
+		}
+	}
+	{
+		TIN_FOR_EACH(joint, scene->joints, Tin_Joint, node) {
+			tin_joint_apply_impulse(joint, invDt);
+		}
 	}
 }
 
@@ -696,5 +709,15 @@ tin_add_arbiter(Tin_Scene *scene)
 	TIN_LIST_LINK(*scene->arbiters.prev, arbiter->node);
 	TIN_LIST_LINK(arbiter->node, scene->arbiters);
 	return arbiter;
+}
+
+Tin_Joint *
+tin_add_joint(Tin_Scene *scene)
+{
+	Tin_Joint *joint = scene->jointAllocator.alloc(scene->jointAllocator.userPointer);
+	memset(joint, 0, sizeof *joint);
+	TIN_LIST_LINK(*scene->joints.prev, joint->node);
+	TIN_LIST_LINK(joint->node, scene->joints);
+	return joint;
 }
 

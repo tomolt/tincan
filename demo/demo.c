@@ -246,15 +246,17 @@ main(void)
 
 	TIN_LIST_INIT(scene.bodies);
 	TIN_LIST_INIT(scene.arbiters);
+	TIN_LIST_INIT(scene.joints);
 	scene.bodyAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Body), custom_alloc, custom_free };
 	scene.arbiterAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Arbiter), custom_alloc, custom_free };
+	scene.jointAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Joint), custom_alloc, custom_free };
 
 	Tin_Body *body1 = tin_add_body(&scene);
 	*body1 = (Tin_Body) {
 		body1->node,
 		{
 			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-			(Tin_Vec3) {{ 0.0f, 0.0f, 0.0f }},
+			(Tin_Vec3) {{ 0.0f, 1.5f, 0.0f }},
 			1.0f
 		},
 		&cone_shape,
@@ -274,12 +276,12 @@ main(void)
 		body2->node,
 		{
 			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-			(Tin_Vec3) {{ 4.0f, 0.9f, -0.3f }},
+			(Tin_Vec3) {{ 0.0f, -1.0f, 0.0f }},
 			1.0f
 		},
 		&cube_shape,
 		1.0f / 3.0f,
-		{{ -5.0f, 0.0f, 0.0f }},
+		{{ -3.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 		//{{ 0.1f, 0.1f, 0.0f }},
 	};
@@ -307,6 +309,12 @@ main(void)
 		&cube_model,
 		{{ 1.0f, 1.0f, 1.0f }}
 	};
+
+	Tin_Joint *joint = tin_add_joint(&scene);
+	joint->body1 = body1;
+	joint->body2 = body2;
+	joint->relTo1 = (Tin_Vec3){{ 0.0f, -1.55f, 0.0f }};
+	joint->relTo2 = (Tin_Vec3){{ 0.0f, 1.05f, 0.0f }};
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -350,6 +358,25 @@ main(void)
 			}
 		}
 #endif
+
+		/* draw joints */
+		TIN_FOR_EACH(joint, scene.joints, Tin_Joint, node) {
+			const Tin_Vec3 color1 = {{ 1.0f, 1.0f, 1.0f }};
+			const Tin_Vec3 color2 = {{ 0.0f, 0.0f, 0.0f }};
+
+			Tin_Transform trf = ident;
+			trf.scale = 0.1f;
+			
+			trf.translation = tin_fwtrf_point(&joint->body1->transform, joint->relTo1);
+			render_draw_model(&cube_model, &trf, color1);
+			trf.translation = tin_sub_v3(trf.translation, joint->debugImpulse);
+			render_draw_model(&cone_model, &trf, color1);
+
+			trf.translation = tin_fwtrf_point(&joint->body2->transform, joint->relTo2);
+			render_draw_model(&cube_model, &trf, color2);
+			trf.translation = tin_add_v3(trf.translation, joint->debugImpulse);
+			render_draw_model(&cone_model, &trf, color2);
+		}
 
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];

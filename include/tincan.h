@@ -188,6 +188,7 @@ typedef struct {
 	Tin_Body *body2;
 	Tin_Vec3 relTo1;
 	Tin_Vec3 relTo2;
+	Tin_Vec3 debugImpulse;
 } Tin_Joint;
 
 void tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt);
@@ -212,5 +213,6 @@ void tin_simulate(Tin_Scene *scene, Tin_Scalar dt);
 
 Tin_Body *tin_add_body(Tin_Scene *scene);
 Tin_Arbiter *tin_add_arbiter(Tin_Scene *scene);
+Tin_Joint *tin_add_joint(Tin_Scene *scene);
 
 #endif
