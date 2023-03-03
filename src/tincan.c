@@ -554,9 +554,18 @@ tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 {
 	Tin_Vec3 pos1 = tin_fwtrf_point(&joint->body1->transform, joint->relTo1);
 	Tin_Vec3 pos2 = tin_fwtrf_point(&joint->body2->transform, joint->relTo2);
-	Tin_Vec3 difference = tin_sub_v3(pos1, pos2);
-	tin_apply_impulse(joint->body1, tin_scale_v3(-1.0f / invDt, difference), pos1);
-	tin_apply_impulse(joint->body2, tin_scale_v3( 1.0f / invDt, difference), pos2);
+
+	Tin_Vec3 r1 = tin_sub_v3(pos1, joint->body1->transform.translation);
+	Tin_Vec3 r2 = tin_sub_v3(pos2, joint->body2->transform.translation);
+
+	Tin_Vec3 direction = tin_normalize_v3(tin_sub_v3(joint->body2->velocity, joint->body1->velocity));
+	Tin_Scalar magnitude = 1.0f / (joint->body1->invMass + joint->body2->invMass + tin_dot_v3(direction, tin_add_v3(
+		tin_cross_v3(tin_solve_inertia(joint->body1, tin_cross_v3(r1, direction)), r1),
+		tin_cross_v3(tin_solve_inertia(joint->body2, tin_cross_v3(r2, direction)), r2))));
+	//Tin_Scalar bias = ;
+
+	tin_apply_impulse(joint->body1, tin_scale_v3(-magnitude / invDt, direction), pos1);
+	tin_apply_impulse(joint->body2, tin_scale_v3( magnitude / invDt, direction), pos2);
 }
 
 Tin_Arbiter *
