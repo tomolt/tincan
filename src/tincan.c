@@ -563,13 +563,14 @@ tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 	Tin_Vec3 r1 = tin_sub_v3(pos1, joint->body1->transform.translation);
 	Tin_Vec3 r2 = tin_sub_v3(pos2, joint->body2->transform.translation);
 
-	Tin_Vec3 difference = tin_sub_v3(joint->body2->velocity, joint->body1->velocity);
+	Tin_Vec3 vp1 = tin_add_v3(joint->body1->velocity, tin_cross_v3(joint->body1->angularVelocity, r1));
+	Tin_Vec3 vp2 = tin_add_v3(joint->body2->velocity, tin_cross_v3(joint->body2->angularVelocity, r2));
+
+	Tin_Vec3 difference = tin_sub_v3(vp2, vp1);
 	printf("|V2-V1| = %f\n", tin_length_v3(difference));
 	Tin_Vec3 direction = tin_normalize_v3(difference);
+	//Tin_Scalar bias = -biasFactor * invDt * tin_dot_v3(difference, tin_sub_v3(pos2, pos1));
 	Tin_Scalar bias = 0.0f;
-	if (tin_dot_v3(difference, difference) >= 0.00001f) {
-		bias = -biasFactor * invDt * tin_dot_v3(difference, tin_sub_v3(pos2, pos1)) / tin_dot_v3(difference, difference);
-	}
 	Tin_Scalar magnitude = (-1.0f + bias) / (joint->body1->invMass + joint->body2->invMass + tin_dot_v3(direction, tin_add_v3(
 		tin_cross_v3(tin_solve_inertia(joint->body1, tin_cross_v3(r1, direction)), r1),
 		tin_cross_v3(tin_solve_inertia(joint->body2, tin_cross_v3(r2, direction)), r2))));
