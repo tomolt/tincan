@@ -647,39 +647,34 @@ tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 void
 tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 {
-	(void)joint, (void)invDt;
-#if 0
 	const Tin_Scalar biasFactor = 0.1f;
 
-	Tin_Vec3 pos1 = tin_fwtrf_point(&joint->body1->transform, joint->relTo1);
-	Tin_Vec3 pos2 = tin_fwtrf_point(&joint->body2->transform, joint->relTo2);
+	Tin_Scalar bias;
+	Tin_Scalar separation;
+	Tin_Scalar jacobian[12];
 
-	Tin_Vec3 r1 = tin_sub_v3(pos1, joint->body1->transform.translation);
-	Tin_Vec3 r2 = tin_sub_v3(pos2, joint->body2->transform.translation);
+	Tin_Vec3 p1 = tin_fwtrf_point(&joint->body1->transform, joint->relTo1);
+	Tin_Vec3 p2 = tin_fwtrf_point(&joint->body2->transform, joint->relTo2);
 
-	Tin_Vec3 vp1 = tin_add_v3(joint->body1->velocity, tin_cross_v3(joint->body1->angularVelocity, r1));
-	Tin_Vec3 vp2 = tin_add_v3(joint->body2->velocity, tin_cross_v3(joint->body2->angularVelocity, r2));
+	Tin_Vec3 r1 = tin_apply_qt(joint->body1->transform.rotation,
+		tin_scale_v3(joint->body1->transform.scale, joint->relTo1));
+	Tin_Vec3 r2 = tin_apply_qt(joint->body2->transform.rotation,
+		tin_scale_v3(joint->body2->transform.scale, joint->relTo2));
 
-	Tin_Vec3 difference = tin_sub_v3(vp2, vp1);
-	printf("|V2-V1| = %f\n", tin_length_v3(difference));
-	Tin_Vec3 direction = tin_normalize_v3(difference);
-	//Tin_Scalar bias = -biasFactor * invDt * tin_dot_v3(difference, tin_sub_v3(pos2, pos1));
-	Tin_Scalar bias = 0.0f;
-	Tin_Scalar magnitude = (-1.0f + bias) / (joint->body1->invMass + joint->body2->invMass + tin_dot_v3(direction, tin_add_v3(
-		tin_cross_v3(tin_solve_inertia(joint->body1, tin_cross_v3(r1, direction)), r1),
-		tin_cross_v3(tin_solve_inertia(joint->body2, tin_cross_v3(r2, direction)), r2))));
+	separation = p2.c[0] - p1.c[0];
+	bias = -biasFactor * invDt * separation;
+	tin_jacobian_along_axis(jacobian, (Tin_Vec3){{1.0f, 0.0f, 0.0f}}, r1, r2);
+	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, bias, NULL, 0.0f, 0.0f);
 
-	Tin_Vec3 impulse = tin_scale_v3(magnitude, difference);
-	joint->debugImpulse = impulse;
+	separation = p2.c[1] - p1.c[1];
+	bias = -biasFactor * invDt * separation;
+	tin_jacobian_along_axis(jacobian, (Tin_Vec3){{0.0f, 1.0f, 0.0f}}, r1, r2);
+	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, bias, NULL, 0.0f, 0.0f);
 
-	tin_apply_impulse(joint->body1, tin_neg_v3(impulse), pos1);
-	tin_apply_impulse(joint->body2, impulse, pos2);
-
-	/*Tin_Vec3 newDifference = tin_sub_v3(joint->body2->velocity, joint->body1->velocity);
-	if (tin_length_v3(newDifference) > 2.0f * tin_length_v3(difference)) {
-		abort();
-	}*/
-#endif
+	separation = p2.c[2] - p1.c[2];
+	bias = -biasFactor * invDt * separation;
+	tin_jacobian_along_axis(jacobian, (Tin_Vec3){{0.0f, 0.0f, 1.0f}}, r1, r2);
+	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, bias, NULL, 0.0f, 0.0f);
 }
 
 Tin_Arbiter *
