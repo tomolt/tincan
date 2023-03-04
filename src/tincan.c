@@ -426,7 +426,8 @@ tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec)
 }
 
 void
-tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], Tin_Scalar bias, Tin_Scalar *ineqAccum)
+tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], Tin_Scalar bias,
+	Tin_Scalar *magnitudeAccum, Tin_Scalar minMagnitude, Tin_Scalar maxMagnitude)
 {
 	Tin_Scalar velocity[12];
 	velocity[0] = body1->velocity.c[0];
@@ -463,13 +464,13 @@ tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], 
 	Tin_Scalar magnitude = (-tin_dot_array(jacobian, velocity, 12) + bias) / tin_dot_array(jacobian, invMassJacobian, 12);
 
 	/* Clamp magnitude to fulfill inequality */
-	if (ineqAccum != NULL) {
-		Tin_Scalar prevAccum = *ineqAccum;
-		*ineqAccum += magnitude;
-		*ineqAccum = MAX(*ineqAccum, 0.0f);
-		magnitude = *ineqAccum - prevAccum;
+	if (magnitudeAccum != NULL) {
+		Tin_Scalar prevAccum = *magnitudeAccum;
+		*magnitudeAccum += magnitude;
+		*magnitudeAccum = MAX(*magnitudeAccum, minMagnitude);
+		*magnitudeAccum = MIN(*magnitudeAccum, maxMagnitude);
+		magnitude = *magnitudeAccum - prevAccum;
 	}
-	printf("mag = %f\n", magnitude);
 
 	/* Apply impulse */
 	for (int i = 0; i < 12; i++) {
@@ -545,6 +546,25 @@ tin_arbiter_add_contact(Tin_Arbiter *arbiter, Tin_Contact contact)
 }
 
 void
+tin_jacobian_along_axis(Tin_Scalar jacobian[12], Tin_Vec3 axis, Tin_Vec3 r1, Tin_Vec3 r2)
+{
+	Tin_Vec3 r1Xaxis = tin_cross_v3(r1, axis);
+	Tin_Vec3 r2Xaxis = tin_cross_v3(r2, axis);
+	jacobian[0] = -axis.c[0];
+	jacobian[1] = -axis.c[1];
+	jacobian[2] = -axis.c[2];
+	jacobian[3] = -r1Xaxis.c[0];
+	jacobian[4] = -r1Xaxis.c[1];
+	jacobian[5] = -r1Xaxis.c[2];
+	jacobian[6] = axis.c[0];
+	jacobian[7] = axis.c[1];
+	jacobian[8] = axis.c[2];
+	jacobian[9] = r2Xaxis.c[0];
+	jacobian[10] = r2Xaxis.c[1];
+	jacobian[11] = r2Xaxis.c[2];
+}
+
+void
 tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
 	const Tin_Scalar allowedPenetration = 0.01f;
@@ -562,37 +582,49 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		Tin_Vec3 r1 = tin_sub_v3(contact->position, arbiter->body1->transform.translation);
 		Tin_Vec3 r2 = tin_sub_v3(contact->position, arbiter->body2->transform.translation);
 
-		Tin_Vec3 r1Xn = tin_cross_v3(r1, contact->normal);
-		Tin_Vec3 r2Xn = tin_cross_v3(r2, contact->normal);
-
 		/* Precompute jacobian and bias */
-		contact->jacobian[0] = -contact->normal.c[0];
-		contact->jacobian[1] = -contact->normal.c[1];
-		contact->jacobian[2] = -contact->normal.c[2];
-		contact->jacobian[3] = -r1Xn.c[0];
-		contact->jacobian[4] = -r1Xn.c[1];
-		contact->jacobian[5] = -r1Xn.c[2];
-		contact->jacobian[6] = contact->normal.c[0];
-		contact->jacobian[7] = contact->normal.c[1];
-		contact->jacobian[8] = contact->normal.c[2];
-		contact->jacobian[9] = r2Xn.c[0];
-		contact->jacobian[10] = r2Xn.c[1];
-		contact->jacobian[11] = r2Xn.c[2];
+		tin_jacobian_along_axis(contact->jacobian, contact->normal, r1, r2);
 
 		contact->bias = -biasFactor * invDt * MIN(0.0f, contact->separation + allowedPenetration);
 
 		contact->ineqAccum = 0.0f;
+		contact->tangentAccum = 0.0f;
+		contact->bitangentAccum = 0.0f;
 	}
 }
 
 void
 tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
+	const Tin_Scalar friction = 0.3f;
+
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
 		if (contact->separation >= 0.0f) continue;
 
-		tin_enforce_jacobian(arbiter->body1, arbiter->body2, contact->jacobian, contact->bias, &contact->ineqAccum);
+		tin_enforce_jacobian(arbiter->body1, arbiter->body2, contact->jacobian, contact->bias, &contact->ineqAccum, 0.0f, INFINITY);
+
+		Tin_Vec3 r1 = tin_apply_qt(arbiter->body1->transform.rotation,
+			tin_scale_v3(arbiter->body1->transform.scale, contact->rel1));
+		Tin_Vec3 r2 = tin_apply_qt(arbiter->body2->transform.rotation,
+			tin_scale_v3(arbiter->body2->transform.scale, contact->rel2));
+
+		Tin_Vec3 tangent1 = tin_gram_schmidt(contact->normal, (Tin_Vec3){{ 1.0f, 0.0f, 0.0f }});
+		if (tin_dot_v3(tangent1, tangent1) == 0.0f) {
+			tangent1 = tin_gram_schmidt(contact->normal, (Tin_Vec3){{ 0.0f, 0.0f, 1.0f }});
+			if (tin_dot_v3(tangent1, tangent1) == 0.0f) {
+				tangent1 = (Tin_Vec3){{ 0.0f, 1.0f, 0.0f }};
+			}
+		}
+		Tin_Vec3 tangent2 = tin_cross_v3(contact->normal, tangent1);
+
+		Tin_Scalar jacobian[12];
+
+		tin_jacobian_along_axis(jacobian, tangent1, r1, r2);
+		tin_enforce_jacobian(arbiter->body1, arbiter->body2, jacobian, 0.0f, &contact->tangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
+
+		tin_jacobian_along_axis(jacobian, tangent2, r1, r2);
+		tin_enforce_jacobian(arbiter->body1, arbiter->body2, jacobian, 0.0f, &contact->bitangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 
 #if 0
 		/* Compute friction impulse */

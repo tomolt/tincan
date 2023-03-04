@@ -160,6 +160,8 @@ typedef struct {
 	Tin_Scalar jacobian[12];
 	Tin_Scalar bias;
 	Tin_Scalar ineqAccum;
+	Tin_Scalar tangentAccum;
+	Tin_Scalar bitangentAccum;
 } Tin_Contact;
 
 int tin_polytope_collide(
