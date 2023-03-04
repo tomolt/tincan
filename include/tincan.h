@@ -157,8 +157,9 @@ typedef struct {
 	Tin_Vec3   position;
 	Tin_Scalar separation;
 	
-	Tin_Scalar normalMass;
+	Tin_Scalar jacobian[12];
 	Tin_Scalar bias;
+	Tin_Scalar ineqAccum;
 } Tin_Contact;
 
 int tin_polytope_collide(
