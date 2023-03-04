@@ -460,7 +460,7 @@ tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], 
 	invMassJacobian[11] = temp.c[2];
 
 	/* Solve for magnitude */
-	Tin_Scalar magnitude = -(tin_dot_array(jacobian, velocity, 12) + bias) / tin_dot_array(jacobian, invMassJacobian, 12);
+	Tin_Scalar magnitude = (-tin_dot_array(jacobian, velocity, 12) + bias) / tin_dot_array(jacobian, invMassJacobian, 12);
 
 	/* Clamp magnitude to fulfill inequality */
 	if (ineqAccum != NULL) {
@@ -469,6 +469,7 @@ tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], 
 		*ineqAccum = MAX(*ineqAccum, 0.0f);
 		magnitude = *ineqAccum - prevAccum;
 	}
+	printf("mag = %f\n", magnitude);
 
 	/* Apply impulse */
 	for (int i = 0; i < 12; i++) {
@@ -567,13 +568,13 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		/* Precompute jacobian and bias */
 		contact->jacobian[0] = -contact->normal.c[0];
 		contact->jacobian[1] = -contact->normal.c[1];
-		contact->jacobian[2] = -contact->normal.c[1];
+		contact->jacobian[2] = -contact->normal.c[2];
 		contact->jacobian[3] = -r1Xn.c[0];
 		contact->jacobian[4] = -r1Xn.c[1];
 		contact->jacobian[5] = -r1Xn.c[2];
 		contact->jacobian[6] = contact->normal.c[0];
 		contact->jacobian[7] = contact->normal.c[1];
-		contact->jacobian[8] = contact->normal.c[1];
+		contact->jacobian[8] = contact->normal.c[2];
 		contact->jacobian[9] = r2Xn.c[0];
 		contact->jacobian[10] = r2Xn.c[1];
 		contact->jacobian[11] = r2Xn.c[2];
