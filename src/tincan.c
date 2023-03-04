@@ -406,6 +406,16 @@ tin_polytope_collide(
 	return 1;
 }
 
+Tin_Scalar
+tin_dot_array(Tin_Scalar a[], Tin_Scalar b[], int length)
+{
+	Tin_Scalar sum = 0.0f;
+	for (int i = 0; i < length; i++) {
+		sum += a[i] * b[i];
+	}
+	return sum;
+}
+
 Tin_Vec3
 tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec)
 {
@@ -413,6 +423,63 @@ tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec)
 	vec = tin_hadamard_v3(tin_scale_v3(body->invMass / (body->transform.scale * body->transform.scale), body->shape->invInertia), vec);
 	vec = tin_fwtrf_dir(&body->transform, vec);
 	return vec;
+}
+
+void
+tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], Tin_Scalar bias, Tin_Scalar *ineqAccum)
+{
+	Tin_Scalar velocity[12];
+	velocity[0] = body1->velocity.c[0];
+	velocity[1] = body1->velocity.c[1];
+	velocity[2] = body1->velocity.c[2];
+	velocity[3] = body1->angularVelocity.c[0];
+	velocity[4] = body1->angularVelocity.c[1];
+	velocity[5] = body1->angularVelocity.c[2];
+	velocity[6] = body2->velocity.c[0];
+	velocity[7] = body2->velocity.c[1];
+	velocity[8] = body2->velocity.c[2];
+	velocity[9] = body2->angularVelocity.c[0];
+	velocity[10] = body2->angularVelocity.c[1];
+	velocity[11] = body2->angularVelocity.c[2];
+
+	Tin_Scalar invMassJacobian[12];
+	Tin_Vec3 temp;
+	invMassJacobian[0] = body1->invMass * jacobian[0];
+	invMassJacobian[1] = body1->invMass * jacobian[1];
+	invMassJacobian[2] = body1->invMass * jacobian[2];
+	temp = tin_solve_inertia(body1, (Tin_Vec3){{ jacobian[3], jacobian[4], jacobian[5] }});
+	invMassJacobian[3] = temp.c[0];
+	invMassJacobian[4] = temp.c[1];
+	invMassJacobian[5] = temp.c[2];
+	invMassJacobian[6] = body2->invMass * jacobian[6];
+	invMassJacobian[7] = body2->invMass * jacobian[7];
+	invMassJacobian[8] = body2->invMass * jacobian[8];
+	temp = tin_solve_inertia(body2, (Tin_Vec3){{ jacobian[9], jacobian[10], jacobian[11] }});
+	invMassJacobian[9] = temp.c[0];
+	invMassJacobian[10] = temp.c[1];
+	invMassJacobian[11] = temp.c[2];
+
+	/* Solve for magnitude */
+	Tin_Scalar magnitude = -(tin_dot_array(jacobian, velocity, 12) + bias) / tin_dot_array(jacobian, invMassJacobian, 12);
+
+	/* Clamp magnitude to fulfill inequality */
+	if (ineqAccum != NULL) {
+		Tin_Scalar prevAccum = *ineqAccum;
+		*ineqAccum += magnitude;
+		*ineqAccum = MAX(*ineqAccum, 0.0f);
+		magnitude = *ineqAccum - prevAccum;
+	}
+
+	/* Apply impulse */
+	for (int i = 0; i < 12; i++) {
+		velocity[i] += magnitude * invMassJacobian[i];
+	}
+
+	/* Modify bodies */
+	body1->velocity = (Tin_Vec3){{ velocity[0], velocity[1], velocity[2] }};
+	body1->angularVelocity = (Tin_Vec3){{ velocity[3], velocity[4], velocity[5] }};
+	body2->velocity = (Tin_Vec3){{ velocity[6], velocity[7], velocity[8] }};
+	body2->angularVelocity = (Tin_Vec3){{ velocity[9], velocity[10], velocity[11] }};
 }
 
 void
