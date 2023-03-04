@@ -313,8 +313,8 @@ main(void)
 	Tin_Joint *joint = tin_add_joint(&scene);
 	joint->body1 = body1;
 	joint->body2 = body2;
-	joint->relTo1 = (Tin_Vec3){{ 0.0f, -1.55f, 0.0f }};
-	joint->relTo2 = (Tin_Vec3){{ 0.0f, 1.05f, 0.0f }};
+	joint->relTo1 = (Tin_Vec3){{ 0.0f, -1.505f, 0.0f }};
+	joint->relTo2 = (Tin_Vec3){{ 0.0f, 1.005f, 0.0f }};
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -359,6 +359,7 @@ main(void)
 		}
 #endif
 
+#if 0
 		/* draw joints */
 		TIN_FOR_EACH(joint, scene.joints, Tin_Joint, node) {
 			const Tin_Vec3 color1 = {{ 1.0f, 1.0f, 1.0f }};
@@ -377,6 +378,7 @@ main(void)
 			trf.translation = tin_add_v3(trf.translation, joint->debugImpulse);
 			render_draw_model(&cone_model, &trf, color2);
 		}
+#endif
 
 		for (int o = 0; o < num_objects; o++) {
 			const Object *obj = &objects[o];
