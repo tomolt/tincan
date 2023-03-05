@@ -270,29 +270,27 @@ tin_refine_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
 			break;
 		}
 
-		if (it >= 100) {
-			fprintf(stderr, "MPR refine_portal() took too many iterations.\n");
-			break;
-		}
-
 		Tin_Pspoint s;
 		tin_polysum_support(ps, p->normal, &s);
 		
 		{
-			Tin_Vec3 as = tin_sub_v3(s.abs, p->a.abs);
-			Tin_Vec3 bs = tin_sub_v3(s.abs, p->b.abs);
-			Tin_Vec3 cs = tin_sub_v3(s.abs, p->c.abs);
-			if (tin_dot_v3(as, p->normal) <= 0.0f) {
-				break;
-			}
-			if (tin_dot_v3(bs, p->normal) <= 0.0f) {
-				break;
-			}
-			if (tin_dot_v3(cs, p->normal) <= 0.0f) {
-				break;
-			}
+			Tin_Scalar sScore = tin_dot_v3(s.abs, p->normal);
+			if (sScore <= 0.0f) break;
+			Tin_Scalar aScore = tin_dot_v3(p->a.abs, p->normal);
+			if (sScore <= aScore * 1.01f) break;
+			if (sScore - aScore <= 1e-6f) break;
 		}
 		
+		if (it >= 100) {
+			fprintf(stderr, "MPR refine_portal() took too many iterations.\n");
+			fprintf(stderr, "\tnormal length squared: %f\n", tin_dot_v3(p->normal, p->normal));
+			Tin_Scalar aScore = tin_dot_v3(p->a.abs, p->normal);
+			Tin_Scalar sScore = tin_dot_v3(s.abs, p->normal);
+			fprintf(stderr, "\taScore: %e\n", aScore);
+			fprintf(stderr, "\tsScore: %e\n", sScore);
+			break;
+		}
+
 		Tin_Vec3 os = tin_sub_v3(s.abs, r->origin);
 		Tin_Vec3 d_x_os = tin_cross_v3(r->dir, os);
 		
