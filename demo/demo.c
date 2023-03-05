@@ -338,7 +338,12 @@ main(void)
 		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);
 		render_view_matrix = mat4_from_inverse_transform(&camtrf);
 
+		double startTime = glfwGetTime();
 		tin_simulate(&scene, dt);
+		double elapsedTime = glfwGetTime() - startTime;
+		char title[100];
+		snprintf(title, sizeof title, "tincan physics demo - %02dms", (int)(elapsedTime * 1000.0f + 0.5f));
+		glfwSetWindowTitle(window, title);
 
 		/* draw contact points */
 #if 0
