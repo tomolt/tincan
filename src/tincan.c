@@ -482,22 +482,13 @@ tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12],
 	Tin_Scalar effectiveMass, Tin_Scalar bias,
 	Tin_Scalar *magnitudeAccum, Tin_Scalar minMagnitude, Tin_Scalar maxMagnitude)
 {
-	Tin_Scalar velocity[12];
-	velocity[0] = body1->velocity.c[0];
-	velocity[1] = body1->velocity.c[1];
-	velocity[2] = body1->velocity.c[2];
-	velocity[3] = body1->angularVelocity.c[0];
-	velocity[4] = body1->angularVelocity.c[1];
-	velocity[5] = body1->angularVelocity.c[2];
-	velocity[6] = body2->velocity.c[0];
-	velocity[7] = body2->velocity.c[1];
-	velocity[8] = body2->velocity.c[2];
-	velocity[9] = body2->angularVelocity.c[0];
-	velocity[10] = body2->angularVelocity.c[1];
-	velocity[11] = body2->angularVelocity.c[2];
-
 	/* Solve for magnitude */
-	Tin_Scalar magnitude = (-tin_dot_array(jacobian, velocity, 12) + bias) * effectiveMass;
+	Tin_Scalar magnitude = bias;
+	magnitude -= tin_dot_array(jacobian + 0, body1->velocity.c, 3);
+	magnitude -= tin_dot_array(jacobian + 3, body1->angularVelocity.c, 3);
+	magnitude -= tin_dot_array(jacobian + 6, body2->velocity.c, 3);
+	magnitude -= tin_dot_array(jacobian + 9, body2->angularVelocity.c, 3);
+	magnitude *= effectiveMass;
 
 	/* Clamp magnitude to fulfill inequality */
 	if (magnitudeAccum != NULL) {
