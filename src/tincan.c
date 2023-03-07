@@ -112,6 +112,32 @@ tin_conjugate_qt(Tin_Quat q)
 	return (Tin_Quat) { tin_neg_v3(q.v), q.s };
 }
 
+void
+tin_qt_to_matrix(Tin_Quat q, Tin_Scalar matrix[3*3])
+{
+	Tin_Scalar ri = q.s * q.v.c[0];
+	Tin_Scalar rj = q.s * q.v.c[1];
+	Tin_Scalar rk = q.s * q.v.c[2];
+
+	Tin_Scalar ii = q.v.c[0] * q.v.c[0];
+	Tin_Scalar jj = q.v.c[1] * q.v.c[1];
+	Tin_Scalar kk = q.v.c[2] * q.v.c[2];
+
+	Tin_Scalar ij = q.v.c[0] * q.v.c[1];
+	Tin_Scalar jk = q.v.c[1] * q.v.c[2];
+	Tin_Scalar ki = q.v.c[2] * q.v.c[0];
+
+	matrix[0] = 1.0f - 2.0f * (jj + kk);
+	matrix[1] = 2.0f * (ij + rk);
+	matrix[2] = 2.0f * (ki - rj);
+	matrix[3] = 2.0f * (ij - rk);
+	matrix[4] = 1.0f - 2.0f * (ii + kk);
+	matrix[5] = 2.0f * (jk + ri);
+	matrix[6] = 2.0f * (ki + rj);
+	matrix[7] = 2.0f * (jk - ri);
+	matrix[8] = 1.0f - 2.0f * (ii + jj);
+}
+
 Tin_Vec3
 tin_gram_schmidt(Tin_Vec3 fixed, Tin_Vec3 var)
 {
@@ -417,10 +443,41 @@ tin_dot_array(Tin_Scalar a[], Tin_Scalar b[], int length)
 Tin_Vec3
 tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec)
 {
-	vec = tin_bwtrf_dir(&body->transform, vec);
-	vec = tin_hadamard_v3(tin_scale_v3(body->invMass / (body->transform.scale * body->transform.scale), body->shape->invInertia), vec);
-	vec = tin_fwtrf_dir(&body->transform, vec);
-	return vec;
+	Tin_Scalar invInertia[3*3];
+
+	Tin_Scalar rotation[3*3];
+	tin_qt_to_matrix(body->transform.rotation, rotation);
+
+	/* Compute product = rotation * inertia_local^-1 */
+	Tin_Scalar factor = body->invMass / (body->transform.scale * body->transform.scale);
+	Tin_Scalar product[3*3];
+	for (int j = 0; j < 3; j++) {
+		Tin_Scalar diagonalEntry = factor * body->shape->invInertia.c[j];
+		product[3*j+0] = rotation[3*j+0] * diagonalEntry;
+		product[3*j+1] = rotation[3*j+1] * diagonalEntry;
+		product[3*j+2] = rotation[3*j+2] * diagonalEntry;
+	}
+
+	/* Compute inertia_global^-1 = rotation * inertia_local^-1 * rotation^T */
+	for (int j = 0; j < 3; j++) {
+		for (int i = 0; i < 3; i++) {
+			Tin_Scalar entry = 0.0f;
+			for (int k = 0; k < 3; k++) {
+				entry += product[i+3*k] * rotation[j+3*k];
+			}
+			invInertia[i+3*j] = entry;
+		}
+	}
+
+	/* Compute inertia_global^-1 * vec */
+	Tin_Vec3 result;
+	for (int i = 0; i < 3; i++) {
+		result.c[i]  = invInertia[i+3*0] * vec.c[0];
+		result.c[i] += invInertia[i+3*1] * vec.c[1];
+		result.c[i] += invInertia[i+3*2] * vec.c[2];
+	}
+
+	return result;
 }
 
 Tin_Scalar

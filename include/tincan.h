@@ -61,6 +61,7 @@ Tin_Quat tin_make_qt (Tin_Vec3 axis, Tin_Scalar angle);
 Tin_Quat tin_mul_qt  (Tin_Quat a, Tin_Quat b);
 Tin_Vec3 tin_apply_qt(Tin_Quat q, Tin_Vec3 v);
 Tin_Quat tin_conjugate_qt(Tin_Quat q);
+void tin_qt_to_matrix(Tin_Quat q, Tin_Scalar matrix[3*3]);
 
 /* Geometric Functions */
 
