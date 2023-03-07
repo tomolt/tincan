@@ -496,23 +496,6 @@ tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12],
 	velocity[10] = body2->angularVelocity.c[1];
 	velocity[11] = body2->angularVelocity.c[2];
 
-	Tin_Scalar invMassJacobian[12];
-	Tin_Vec3 temp;
-	invMassJacobian[0] = body1->invMass * jacobian[0];
-	invMassJacobian[1] = body1->invMass * jacobian[1];
-	invMassJacobian[2] = body1->invMass * jacobian[2];
-	temp = tin_solve_inertia(body1, (Tin_Vec3){{ jacobian[3], jacobian[4], jacobian[5] }});
-	invMassJacobian[3] = temp.c[0];
-	invMassJacobian[4] = temp.c[1];
-	invMassJacobian[5] = temp.c[2];
-	invMassJacobian[6] = body2->invMass * jacobian[6];
-	invMassJacobian[7] = body2->invMass * jacobian[7];
-	invMassJacobian[8] = body2->invMass * jacobian[8];
-	temp = tin_solve_inertia(body2, (Tin_Vec3){{ jacobian[9], jacobian[10], jacobian[11] }});
-	invMassJacobian[9] = temp.c[0];
-	invMassJacobian[10] = temp.c[1];
-	invMassJacobian[11] = temp.c[2];
-
 	/* Solve for magnitude */
 	Tin_Scalar magnitude = (-tin_dot_array(jacobian, velocity, 12) + bias) * effectiveMass;
 
@@ -526,15 +509,10 @@ tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12],
 	}
 
 	/* Apply impulse */
-	for (int i = 0; i < 12; i++) {
-		velocity[i] += magnitude * invMassJacobian[i];
-	}
-
-	/* Modify bodies */
-	body1->velocity = (Tin_Vec3){{ velocity[0], velocity[1], velocity[2] }};
-	body1->angularVelocity = (Tin_Vec3){{ velocity[3], velocity[4], velocity[5] }};
-	body2->velocity = (Tin_Vec3){{ velocity[6], velocity[7], velocity[8] }};
-	body2->angularVelocity = (Tin_Vec3){{ velocity[9], velocity[10], velocity[11] }};
+	body1->velocity = tin_saxpy_v3(magnitude * body1->invMass, (Tin_Vec3){{ jacobian[0], jacobian[1], jacobian[2] }}, body1->velocity);
+	body1->angularVelocity = tin_saxpy_v3(magnitude, tin_solve_inertia(body1, (Tin_Vec3){{ jacobian[3], jacobian[4], jacobian[5] }}), body1->angularVelocity);
+	body2->velocity = tin_saxpy_v3(magnitude * body2->invMass, (Tin_Vec3){{ jacobian[6], jacobian[7], jacobian[8] }}, body2->velocity);
+	body2->angularVelocity = tin_saxpy_v3(magnitude, tin_solve_inertia(body2, (Tin_Vec3){{ jacobian[9], jacobian[10], jacobian[11] }}), body2->angularVelocity);
 }
 
 void
