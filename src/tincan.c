@@ -443,40 +443,13 @@ tin_dot_array(Tin_Scalar a[], Tin_Scalar b[], int length)
 Tin_Vec3
 tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec)
 {
-	Tin_Scalar invInertia[3*3];
-
-	Tin_Scalar rotation[3*3];
-	tin_qt_to_matrix(body->transform.rotation, rotation);
-
-	/* Compute product = rotation * inertia_local^-1 */
-	Tin_Scalar factor = body->invMass / (body->transform.scale * body->transform.scale);
-	Tin_Scalar product[3*3];
-	for (int j = 0; j < 3; j++) {
-		Tin_Scalar diagonalEntry = factor * body->shape->invInertia.c[j];
-		product[3*j+0] = rotation[3*j+0] * diagonalEntry;
-		product[3*j+1] = rotation[3*j+1] * diagonalEntry;
-		product[3*j+2] = rotation[3*j+2] * diagonalEntry;
-	}
-
-	/* Compute inertia_global^-1 = rotation * inertia_local^-1 * rotation^T */
-	for (int j = 0; j < 3; j++) {
-		for (int i = 0; i < 3; i++) {
-			Tin_Scalar entry = 0.0f;
-			for (int k = 0; k < 3; k++) {
-				entry += product[i+3*k] * rotation[j+3*k];
-			}
-			invInertia[i+3*j] = entry;
-		}
-	}
-
 	/* Compute inertia_global^-1 * vec */
 	Tin_Vec3 result;
 	for (int i = 0; i < 3; i++) {
-		result.c[i]  = invInertia[i+3*0] * vec.c[0];
-		result.c[i] += invInertia[i+3*1] * vec.c[1];
-		result.c[i] += invInertia[i+3*2] * vec.c[2];
+		result.c[i]  = body->invInertia[i+3*0] * vec.c[0];
+		result.c[i] += body->invInertia[i+3*1] * vec.c[1];
+		result.c[i] += body->invInertia[i+3*2] * vec.c[2];
 	}
-
 	return result;
 }
 
@@ -766,8 +739,37 @@ tin_find_arbiter(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2)
 void
 tin_scene_update(Tin_Scene *scene)
 {
-	TIN_FOR_EACH(arbiter, scene->arbiters, Tin_Arbiter, node) {
-		tin_arbiter_update(arbiter);
+	{
+		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+			Tin_Scalar rotation[3*3];
+			tin_qt_to_matrix(body->transform.rotation, rotation);
+
+			/* Compute product = rotation * inertia_local^-1 */
+			Tin_Scalar factor = body->invMass / (body->transform.scale * body->transform.scale);
+			Tin_Scalar product[3*3];
+			for (int j = 0; j < 3; j++) {
+				Tin_Scalar diagonalEntry = factor * body->shape->invInertia.c[j];
+				product[3*j+0] = rotation[3*j+0] * diagonalEntry;
+				product[3*j+1] = rotation[3*j+1] * diagonalEntry;
+				product[3*j+2] = rotation[3*j+2] * diagonalEntry;
+			}
+
+			/* Compute inertia_global^-1 = rotation * inertia_local^-1 * rotation^T */
+			for (int j = 0; j < 3; j++) {
+				for (int i = 0; i < 3; i++) {
+					Tin_Scalar entry = 0.0f;
+					for (int k = 0; k < 3; k++) {
+						entry += product[i+3*k] * rotation[j+3*k];
+					}
+					body->invInertia[i+3*j] = entry;
+				}
+			}
+		}
+	}
+	{
+		TIN_FOR_EACH(arbiter, scene->arbiters, Tin_Arbiter, node) {
+			tin_arbiter_update(arbiter);
+		}
 	}
 }
 

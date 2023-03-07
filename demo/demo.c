@@ -164,6 +164,7 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 				1.0f / 1.0f,
 				tin_scale_v3(5.0f, forward),
 				{{ 0.0f, 0.0f, 0.0f }},
+				{ 0 }
 			};
 			objects[num_objects++] = (Object) {
 				body,
@@ -264,6 +265,7 @@ main(void)
 		//{{ 0.0f, 0.0f, -0.5f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
+		{ 0 }
 	};
 	objects[num_objects++] = (Object) {
 		body1,
@@ -284,6 +286,7 @@ main(void)
 		{{ -3.0f, 1.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 		//{{ 0.1f, 0.1f, 0.0f }},
+		{ 0 }
 	};
 	objects[num_objects++] = (Object) {
 		body2,
@@ -303,6 +306,7 @@ main(void)
 		0.0f,
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
+		{ 0 }
 	};
 	objects[num_objects++] = (Object) {
 		body3,

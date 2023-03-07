@@ -113,6 +113,7 @@ typedef struct {
 	Tin_Scalar    invMass;
 	Tin_Vec3      velocity;
 	Tin_Vec3      angularVelocity;
+	Tin_Scalar    invInertia[3*3];
 } Tin_Body;
 
 /* Minkowski sum (difference) of transformed convex polytopes */
