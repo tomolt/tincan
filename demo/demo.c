@@ -336,7 +336,7 @@ main(void)
 		Tin_Transform camtrf;
 		camera_transform(&camera, &camtrf);
 
-		Tin_Transform ident = { .rotation = { {{ 0.0f, 0.0f, 0.0f }}, 1.0f }, .scale = 1.0f };
+		Tin_Transform ident = { .quaternion = { {{ 0.0f, 0.0f, 0.0f }}, 1.0f }, .scale = 1.0f };
 
 		render_start_models();
 		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);
@@ -402,7 +402,7 @@ main(void)
 			sum.transform1 = &obj->body.transform;
 			sum.polytope2 = &dot;
 			sum.transform2 = &ident;
-			Tin_Ray ray = { .origin = camtrf.translation, .dir = tin_apply_qt(camtrf.rotation, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }}) };
+			Tin_Ray ray = { .origin = camtrf.translation, .dir = tin_apply_qt(camtrf.quaternion, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }}) };
 			Tin_Portal temp_portal;
 			if (tin_construct_portal(&sum, &ray, &temp_portal)) {
 				color = (Tin_Vec3) {{ 1.0f, 0.0f, 0.0f }};

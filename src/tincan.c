@@ -160,7 +160,7 @@ Tin_Vec3
 tin_fwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 {
 	vec = tin_scale_v3(transform->scale,       vec);
-	vec = tin_apply_qt(transform->rotation,    vec);
+	vec = tin_apply_qt(transform->quaternion,    vec);
 	vec = tin_add_v3  (transform->translation, vec);
 	return vec;
 }
@@ -168,14 +168,14 @@ tin_fwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 Tin_Vec3
 tin_fwtrf_dir(const Tin_Transform *transform, Tin_Vec3 vec)
 {
-	return tin_apply_qt(transform->rotation, vec);
+	return tin_apply_qt(transform->quaternion, vec);
 }
 
 Tin_Vec3
 tin_bwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 {
 	vec = tin_sub_v3  (vec, transform->translation);
-	vec = tin_apply_qt(tin_conjugate_qt(transform->rotation), vec);
+	vec = tin_apply_qt(tin_conjugate_qt(transform->quaternion), vec);
 	vec = tin_scale_v3(1.0f / transform->scale, vec);
 	return vec;
 }
@@ -183,7 +183,7 @@ tin_bwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 Tin_Vec3
 tin_bwtrf_dir(const Tin_Transform *transform, Tin_Vec3 vec)
 {
-	return tin_apply_qt(tin_conjugate_qt(transform->rotation), vec);
+	return tin_apply_qt(tin_conjugate_qt(transform->quaternion), vec);
 }
 
 Tin_Vec3
@@ -627,9 +627,9 @@ tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 
 		tin_enforce_jacobian(arbiter->body1, arbiter->body2, contact->jacobian, contact->effectiveMass[0], contact->bias, &contact->ineqAccum, 0.0f, INFINITY);
 
-		Tin_Vec3 r1 = tin_apply_qt(arbiter->body1->transform.rotation,
+		Tin_Vec3 r1 = tin_apply_qt(arbiter->body1->transform.quaternion,
 			tin_scale_v3(arbiter->body1->transform.scale, contact->rel1));
-		Tin_Vec3 r2 = tin_apply_qt(arbiter->body2->transform.rotation,
+		Tin_Vec3 r2 = tin_apply_qt(arbiter->body2->transform.quaternion,
 			tin_scale_v3(arbiter->body2->transform.scale, contact->rel2));
 
 		Tin_Vec3 tangent1 = tin_gram_schmidt(contact->normal, (Tin_Vec3){{ 1.0f, 0.0f, 0.0f }});
@@ -667,9 +667,9 @@ tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 	Tin_Vec3 p1 = tin_fwtrf_point(&joint->body1->transform, joint->relTo1);
 	Tin_Vec3 p2 = tin_fwtrf_point(&joint->body2->transform, joint->relTo2);
 
-	Tin_Vec3 r1 = tin_apply_qt(joint->body1->transform.rotation,
+	Tin_Vec3 r1 = tin_apply_qt(joint->body1->transform.quaternion,
 		tin_scale_v3(joint->body1->transform.scale, joint->relTo1));
-	Tin_Vec3 r2 = tin_apply_qt(joint->body2->transform.rotation,
+	Tin_Vec3 r2 = tin_apply_qt(joint->body2->transform.quaternion,
 		tin_scale_v3(joint->body2->transform.scale, joint->relTo2));
 
 	separation = p2.c[0] - p1.c[0];
@@ -711,7 +711,7 @@ tin_scene_update(Tin_Scene *scene)
 	{
 		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
 			Tin_Scalar rotation[3*3];
-			tin_qt_to_matrix(body->transform.rotation, rotation);
+			tin_qt_to_matrix(body->transform.quaternion, rotation);
 
 			/* Compute product = rotation * inertia_local^-1 */
 			Tin_Scalar factor = body->invMass / (body->transform.scale * body->transform.scale);
@@ -795,8 +795,8 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 		Tin_Scalar angle = sqrtf(tin_dot_v3(body->angularVelocity, body->angularVelocity));
 		
 		if (fabs(angle) > 100.0f * TIN_EPSILON) {
-			body->transform.rotation = tin_mul_qt(
-				tin_make_qt(tin_normalize_v3(body->angularVelocity), angle * dt), body->transform.rotation);
+			body->transform.quaternion = tin_mul_qt(
+				tin_make_qt(tin_normalize_v3(body->angularVelocity), angle * dt), body->transform.quaternion);
 		}
 
 		if (body->invMass != 0.0f) {

@@ -75,7 +75,7 @@ mat4_scale(Tin_Scalar s)
 Mat4
 mat4_from_transform(const Tin_Transform *transform)
 {
-	Mat4 R = mat4_rotation(transform->rotation);
+	Mat4 R = mat4_rotation(transform->quaternion);
 	Mat4 T = mat4_translation(transform->translation);
 	Mat4 S = mat4_scale(transform->scale);
 	return mat4_multiply(mat4_multiply(T, S), R);
@@ -84,7 +84,7 @@ mat4_from_transform(const Tin_Transform *transform)
 Mat4
 mat4_from_inverse_transform(const Tin_Transform *transform)
 {
-	Mat4 R = mat4_rotation(tin_conjugate_qt(transform->rotation));
+	Mat4 R = mat4_rotation(tin_conjugate_qt(transform->quaternion));
 	Mat4 T = mat4_translation(tin_neg_v3(transform->translation));
 	Mat4 S = mat4_scale(1.0f / transform->scale);
 	return mat4_multiply(mat4_multiply(R, S), T);

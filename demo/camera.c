@@ -35,7 +35,7 @@ void
 camera_transform(const Camera *camera, Tin_Transform *transform)
 {
 	transform->translation = camera->position;
-	transform->rotation    = camera->quat;
+	transform->quaternion  = camera->quat;
 	transform->scale       = 1.0f;
 }
 
