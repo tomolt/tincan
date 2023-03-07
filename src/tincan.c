@@ -159,23 +159,29 @@ tin_prlgram_area(Tin_Vec3 e1, Tin_Vec3 e2)
 Tin_Vec3
 tin_fwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 {
-	vec = tin_scale_v3(transform->scale,       vec);
-	vec = tin_apply_qt(transform->quaternion,    vec);
-	vec = tin_add_v3  (transform->translation, vec);
+	vec = tin_scale_v3(transform->scale, vec);
+	vec = tin_fwtrf_dir(transform, vec);
+	vec = tin_add_v3(transform->translation, vec);
 	return vec;
 }
 
 Tin_Vec3
 tin_fwtrf_dir(const Tin_Transform *transform, Tin_Vec3 vec)
 {
-	return tin_apply_qt(transform->quaternion, vec);
+	Tin_Vec3 result;
+	for (int i = 0; i < 3; i++) {
+		result.c[i]  = transform->rotation[i+3*0] * vec.c[0];
+		result.c[i] += transform->rotation[i+3*1] * vec.c[1];
+		result.c[i] += transform->rotation[i+3*2] * vec.c[2];
+	}
+	return result;
 }
 
 Tin_Vec3
 tin_bwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 {
-	vec = tin_sub_v3  (vec, transform->translation);
-	vec = tin_apply_qt(tin_conjugate_qt(transform->quaternion), vec);
+	vec = tin_sub_v3(vec, transform->translation);
+	vec = tin_bwtrf_dir(transform, vec);
 	vec = tin_scale_v3(1.0f / transform->scale, vec);
 	return vec;
 }
@@ -183,7 +189,13 @@ tin_bwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 Tin_Vec3
 tin_bwtrf_dir(const Tin_Transform *transform, Tin_Vec3 vec)
 {
-	return tin_apply_qt(tin_conjugate_qt(transform->quaternion), vec);
+	Tin_Vec3 result;
+	for (int i = 0; i < 3; i++) {
+		result.c[i]  = transform->rotation[0+3*i] * vec.c[0];
+		result.c[i] += transform->rotation[1+3*i] * vec.c[1];
+		result.c[i] += transform->rotation[2+3*i] * vec.c[2];
+	}
+	return result;
 }
 
 Tin_Vec3
@@ -710,8 +722,8 @@ tin_scene_update(Tin_Scene *scene)
 {
 	{
 		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
-			Tin_Scalar rotation[3*3];
-			tin_qt_to_matrix(body->transform.quaternion, rotation);
+			tin_qt_to_matrix(body->transform.quaternion, body->transform.rotation);
+			Tin_Scalar *rotation = body->transform.rotation;
 
 			/* Compute product = rotation * inertia_local^-1 */
 			Tin_Scalar factor = body->invMass / (body->transform.scale * body->transform.scale);

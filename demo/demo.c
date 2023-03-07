@@ -157,6 +157,7 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 				body->node,
 				{
 					cam->quat,
+					{ 0 },
 					tin_saxpy_v3(1.0f, forward, cam->position),
 					0.2f,
 				},
@@ -257,6 +258,7 @@ main(void)
 		body1->node,
 		{
 			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			{ 0 },
 			(Tin_Vec3) {{ 0.0f, 1.5f, 0.0f }},
 			1.0f
 		},
@@ -278,6 +280,7 @@ main(void)
 		body2->node,
 		{
 			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			{ 0 },
 			(Tin_Vec3) {{ 0.0f, -1.0f, 0.0f }},
 			1.0f
 		},
@@ -299,6 +302,7 @@ main(void)
 		body3->node,
 		{
 			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
+			{ 0 },
 			(Tin_Vec3) {{ 0.0f, -23.0f, 0.0f }},
 			20.0f
 		},

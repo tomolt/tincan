@@ -72,6 +72,7 @@ Tin_Scalar tin_prlgram_area(Tin_Vec3 e1, Tin_Vec3 e2);
 
 typedef struct {
 	Tin_Quat   quaternion; // TODO remove
+	Tin_Scalar rotation[3*3];
 	Tin_Vec3   translation;
 	Tin_Scalar scale;
 } Tin_Transform;
