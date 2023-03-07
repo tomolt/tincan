@@ -26,7 +26,7 @@ An Overview of the internals of tincan
   - TBD Warmstarting of Lagrange magnitudes (needs projection onto new Jacobian)
   - TBD Process islands on separate threads
   - TBD SIMD? Perhaps Gauss-Seidel-Jacobi hybrid
-  - TBD transform inverse Inertia etc. in world-space beforehand
+  - transform inverse Inertia etc. in world-space beforehand
 * Position integration
   - Semi-implicit Euler integration
 
