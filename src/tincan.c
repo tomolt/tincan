@@ -814,9 +814,12 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 	}
 }
 
-void
-tin_broadphase(Tin_Scene *scene, void (*func)(Tin_Scene *, Tin_Body *, Tin_Body *))
+Tin_Collision *
+tin_broadphase(Tin_Scene *scene, size_t *count_out)
 {
+	size_t capac = 0, count = 0;
+	Tin_Collision *collisions = NULL;
+
 	TIN_FOR_EACH(body1, scene->bodies, Tin_Body, node) {
 		TIN_FOR_RANGE(body2, body1->node, scene->bodies, Tin_Body, node) {
 			Tin_Vec3 diff = tin_sub_v3(body2->transform.translation, body1->transform.translation);
@@ -824,9 +827,24 @@ tin_broadphase(Tin_Scene *scene, void (*func)(Tin_Scene *, Tin_Body *, Tin_Body 
 				body2->shape->radius * body2->transform.scale +
 				body1->shape->radius * body1->transform.scale;
 			if (tin_dot_v3(diff, diff) <= radii * radii) {
-				func(scene, body1, body2);
+				if (count == capac) {
+					capac = capac ? 2*capac : 16;
+					collisions = realloc(collisions, capac * sizeof *collisions);
+				}
+				collisions[count++] = (Tin_Collision){ body1, body2 };
 			}
 		}
+	}
+
+	*count_out = count;
+	return collisions;
+}
+
+void
+tin_narrowphase(Tin_Scene *scene, Tin_Collision *collisions, size_t num_collisions)
+{
+	for (size_t i = 0; i < num_collisions; i++) {
+		tin_check_collision(scene, collisions[i].bodyA, collisions[i].bodyB);
 	}
 }
 
@@ -837,7 +855,10 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt)
 	Tin_Scalar stepInvDt = 1.0f / stepDt;
 	for (int step = 0; step < 4; step++) {
 		tin_scene_update(scene);
-		tin_broadphase(scene, tin_check_collision);
+		size_t num_collisions;
+		Tin_Collision *collisions = tin_broadphase(scene, &num_collisions);
+		tin_narrowphase(scene, collisions, num_collisions);
+		free(collisions);
 		tin_scene_prestep(scene, stepInvDt);
 		for (int iter = 0; iter < 4; iter++) {
 			tin_scene_step(scene, stepInvDt);

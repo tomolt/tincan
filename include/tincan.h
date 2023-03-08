@@ -139,6 +139,11 @@ typedef struct {
 	Tin_Vec3    normal;
 } Tin_Portal;
 
+typedef struct {
+	Tin_Body *bodyA;
+	Tin_Body *bodyB;
+} Tin_Collision;
+
 int  tin_construct_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p);
 void tin_refine_portal   (const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p);
 
@@ -208,7 +213,7 @@ void tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2);
 void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt);
 void tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt);
 void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
-void tin_broadphase(Tin_Scene *scene, void (*func)(Tin_Scene *, Tin_Body *, Tin_Body *));
+Tin_Collision * tin_broadphase(Tin_Scene *scene, size_t *count_out);
 void tin_simulate(Tin_Scene *scene, Tin_Scalar dt);
 
 Tin_Body *tin_add_body(Tin_Scene *scene);
