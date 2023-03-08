@@ -1,5 +1,5 @@
 typedef struct {
-	Tin_Quat quat;
+	Tin_Scalar rotation[3*3];
 
 	Tin_Vec3 position;
 	float    yaw;

@@ -9,6 +9,8 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
+#define M3(matrix,row,column) (matrix[(row)+3*(column)])
+
 Tin_Vec3
 tin_neg_v3(Tin_Vec3 x)
 {
@@ -78,66 +80,6 @@ tin_hadamard_v3(Tin_Vec3 a, Tin_Vec3 b)
 	return (Tin_Vec3) {{ a.c[0]*b.c[0], a.c[1]*b.c[1], a.c[2]*b.c[2] }};
 }
 
-Tin_Quat
-tin_make_qt(Tin_Vec3 axis, Tin_Scalar angle)
-{
-	Tin_Scalar h = angle / 2.0f;
-	return (Tin_Quat) { tin_scale_v3(sin(h), axis), cos(h) };
-}
-
-Tin_Quat
-tin_mul_qt(Tin_Quat a, Tin_Quat b)
-{
-	Tin_Quat d;
-	d.v = tin_cross_v3(a.v, b.v);
-	d.v = tin_saxpy_v3(a.s, b.v, d.v);
-	d.v = tin_saxpy_v3(b.s, a.v, d.v);
-	d.s = a.s * b.s - tin_dot_v3(a.v, b.v);
-	return d;
-}
-
-Tin_Vec3
-tin_apply_qt(Tin_Quat q, Tin_Vec3 v)
-{
-	Tin_Vec3 t = tin_cross_v3(q.v, v);
-	Tin_Vec3 d = tin_cross_v3(q.v, t);
-	d = tin_saxpy_v3(q.s, t, d);
-	d = tin_saxpy_v3(2.0f, d, v);
-	return d;
-}
-
-Tin_Quat
-tin_conjugate_qt(Tin_Quat q)
-{
-	return (Tin_Quat) { tin_neg_v3(q.v), q.s };
-}
-
-void
-tin_qt_to_matrix(Tin_Quat q, Tin_Scalar matrix[3*3])
-{
-	Tin_Scalar ri = q.s * q.v.c[0];
-	Tin_Scalar rj = q.s * q.v.c[1];
-	Tin_Scalar rk = q.s * q.v.c[2];
-
-	Tin_Scalar ii = q.v.c[0] * q.v.c[0];
-	Tin_Scalar jj = q.v.c[1] * q.v.c[1];
-	Tin_Scalar kk = q.v.c[2] * q.v.c[2];
-
-	Tin_Scalar ij = q.v.c[0] * q.v.c[1];
-	Tin_Scalar jk = q.v.c[1] * q.v.c[2];
-	Tin_Scalar ki = q.v.c[2] * q.v.c[0];
-
-	matrix[0] = 1.0f - 2.0f * (jj + kk);
-	matrix[1] = 2.0f * (ij + rk);
-	matrix[2] = 2.0f * (ki - rj);
-	matrix[3] = 2.0f * (ij - rk);
-	matrix[4] = 1.0f - 2.0f * (ii + kk);
-	matrix[5] = 2.0f * (jk + ri);
-	matrix[6] = 2.0f * (ki + rj);
-	matrix[7] = 2.0f * (jk - ri);
-	matrix[8] = 1.0f - 2.0f * (ii + jj);
-}
-
 void
 tin_axis_angle_to_matrix(Tin_Vec3 axis, Tin_Scalar angle, Tin_Scalar matrix[3*3])
 {
@@ -162,6 +104,58 @@ tin_axis_angle_to_matrix(Tin_Vec3 axis, Tin_Scalar angle, Tin_Scalar matrix[3*3]
 	matrix[6] = zxAntiCos + ySin;
 	matrix[7] = yzAntiCos - xSin;
 	matrix[8] = cosAngle + axis.c[2] * axis.c[2] * antiCos;
+}
+
+void
+tin_m3_times_m3(Tin_Scalar result[3*3], const Tin_Scalar matrixA[3*3], const Tin_Scalar matrixB[3*3])
+{
+	Tin_Scalar element;
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			element  = M3(matrixA,i,0) * M3(matrixB,0,j);
+			element += M3(matrixA,i,1) * M3(matrixB,1,j);
+			element += M3(matrixA,i,2) * M3(matrixB,2,j);
+			M3(result,i,j) = element;
+		}
+	}
+}
+
+void
+tin_m3_times_m3_transposed(Tin_Scalar result[3*3], const Tin_Scalar matrixA[3*3], const Tin_Scalar matrixB[3*3])
+{
+	Tin_Scalar element;
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			element  = M3(matrixA,i,0) * M3(matrixB,j,0);
+			element += M3(matrixA,i,1) * M3(matrixB,j,1);
+			element += M3(matrixA,i,2) * M3(matrixB,j,2);
+			M3(result,i,j) = element;
+		}
+	}
+}
+
+Tin_Vec3
+tin_m3_times_v3(const Tin_Scalar matrix[3*3], Tin_Vec3 vector)
+{
+	Tin_Vec3 result;
+	for (int i = 0; i < 3; i++) {
+		result.c[i]  = M3(matrix,i,0) * vector.c[0];
+		result.c[i] += M3(matrix,i,1) * vector.c[1];
+		result.c[i] += M3(matrix,i,2) * vector.c[2];
+	}
+	return result;
+}
+
+Tin_Vec3
+tin_v3_times_m3(Tin_Vec3 vector, const Tin_Scalar matrix[3*3])
+{
+	Tin_Vec3 result;
+	for (int i = 0; i < 3; i++) {
+		result.c[i]  = vector.c[0] * M3(matrix,0,i);
+		result.c[i] += vector.c[1] * M3(matrix,1,i);
+		result.c[i] += vector.c[2] * M3(matrix,2,i);
+	}
+	return result;
 }
 
 Tin_Vec3
@@ -194,13 +188,7 @@ tin_fwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 Tin_Vec3
 tin_fwtrf_dir(const Tin_Transform *transform, Tin_Vec3 vec)
 {
-	Tin_Vec3 result;
-	for (int i = 0; i < 3; i++) {
-		result.c[i]  = transform->rotation[i+3*0] * vec.c[0];
-		result.c[i] += transform->rotation[i+3*1] * vec.c[1];
-		result.c[i] += transform->rotation[i+3*2] * vec.c[2];
-	}
-	return result;
+	return tin_m3_times_v3(transform->rotation, vec);
 }
 
 Tin_Vec3
@@ -215,13 +203,7 @@ tin_bwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 Tin_Vec3
 tin_bwtrf_dir(const Tin_Transform *transform, Tin_Vec3 vec)
 {
-	Tin_Vec3 result;
-	for (int i = 0; i < 3; i++) {
-		result.c[i]  = transform->rotation[0+3*i] * vec.c[0];
-		result.c[i] += transform->rotation[1+3*i] * vec.c[1];
-		result.c[i] += transform->rotation[2+3*i] * vec.c[2];
-	}
-	return result;
+	return tin_v3_times_m3(vec, transform->rotation);
 }
 
 Tin_Vec3
@@ -481,14 +463,7 @@ tin_dot_array(Tin_Scalar a[], Tin_Scalar b[], int length)
 Tin_Vec3
 tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec)
 {
-	/* Compute inertia_global^-1 * vec */
-	Tin_Vec3 result;
-	for (int i = 0; i < 3; i++) {
-		result.c[i]  = body->invInertia[i+3*0] * vec.c[0];
-		result.c[i] += body->invInertia[i+3*1] * vec.c[1];
-		result.c[i] += body->invInertia[i+3*2] * vec.c[2];
-	}
-	return result;
+	return tin_m3_times_v3(body->invInertia, vec);
 }
 
 Tin_Scalar
@@ -748,7 +723,6 @@ tin_scene_update(Tin_Scene *scene)
 {
 	{
 		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
-			tin_qt_to_matrix(body->transform.quaternion, body->transform.rotation);
 			Tin_Scalar *rotation = body->transform.rotation;
 
 			/* Compute product = rotation * inertia_local^-1 */
@@ -762,15 +736,7 @@ tin_scene_update(Tin_Scene *scene)
 			}
 
 			/* Compute inertia_global^-1 = rotation * inertia_local^-1 * rotation^T */
-			for (int j = 0; j < 3; j++) {
-				for (int i = 0; i < 3; i++) {
-					Tin_Scalar entry = 0.0f;
-					for (int k = 0; k < 3; k++) {
-						entry += product[i+3*k] * rotation[j+3*k];
-					}
-					body->invInertia[i+3*j] = entry;
-				}
-			}
+			tin_m3_times_m3_transposed(body->invInertia, product, rotation);
 		}
 	}
 	{
@@ -833,8 +799,13 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 		Tin_Scalar angle = sqrt(tin_dot_v3(body->angularVelocity, body->angularVelocity));
 		
 		if (fabs(angle) > 100.0f * TIN_EPSILON) {
-			body->transform.quaternion = tin_mul_qt(
-				tin_make_qt(tin_normalize_v3(body->angularVelocity), angle * dt), body->transform.quaternion);
+			Tin_Scalar change[3*3];
+			tin_axis_angle_to_matrix(tin_normalize_v3(body->angularVelocity), angle * dt, change);
+
+			Tin_Scalar copyOfRotation[3*3];
+			memcpy(copyOfRotation, body->transform.rotation, sizeof copyOfRotation);
+			
+			tin_m3_times_m3(body->transform.rotation, change, copyOfRotation);
 		}
 
 		if (body->invMass != 0.0f) {

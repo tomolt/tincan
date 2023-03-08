@@ -7,6 +7,18 @@
 #define M4(A,i,j) ((A.c)+4*(i)+(j))
 
 Mat4
+mat4_transpose(Mat4 matrix)
+{
+	Mat4 transposed;
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			*M4(transposed,i,j) = *M4(matrix,j,i);
+		}
+	}
+	return transposed;
+}
+
+Mat4
 mat4_perspective(Tin_Scalar fovy, Tin_Scalar aspect, Tin_Scalar near, Tin_Scalar far)
 {
 	Mat4 D = {{ 0 }};
@@ -34,17 +46,16 @@ mat4_orthographic(int width, int height)
 }
 
 static Mat4
-mat4_rotation(Tin_Quat q)
+mat4_rotation(const Tin_Scalar rotation[3*3])
 {
-	Tin_Vec3 a = tin_apply_qt(q, (Tin_Vec3) {{ 1.0f, 0.0f, 0.0f }});
-	Tin_Vec3 b = tin_apply_qt(q, (Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }});
-	Tin_Vec3 c = tin_apply_qt(q, (Tin_Vec3) {{ 0.0f, 0.0f, 1.0f }});
-	Mat4 M = {{ 0 }};
-	memcpy(M.c + 0, a.c, 3 * sizeof (float));
-	memcpy(M.c + 4, b.c, 3 * sizeof (float));
-	memcpy(M.c + 8, c.c, 3 * sizeof (float));
-	M.c[15] = 1.0f;
-	return M;
+	Mat4 matrix = {{ 0 }};
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			matrix.c[4*i+j] = rotation[3*i+j];
+		}
+	}
+	matrix.c[15] = 1.0f;
+	return matrix;
 }
 
 static Mat4
@@ -75,7 +86,7 @@ mat4_scale(Tin_Scalar s)
 Mat4
 mat4_from_transform(const Tin_Transform *transform)
 {
-	Mat4 R = mat4_rotation(transform->quaternion);
+	Mat4 R = mat4_rotation(transform->rotation);
 	Mat4 T = mat4_translation(transform->translation);
 	Mat4 S = mat4_scale(transform->scale);
 	return mat4_multiply(mat4_multiply(T, S), R);
@@ -84,7 +95,7 @@ mat4_from_transform(const Tin_Transform *transform)
 Mat4
 mat4_from_inverse_transform(const Tin_Transform *transform)
 {
-	Mat4 R = mat4_rotation(tin_conjugate_qt(transform->quaternion));
+	Mat4 R = mat4_transpose(mat4_rotation(transform->rotation));
 	Mat4 T = mat4_translation(tin_neg_v3(transform->translation));
 	Mat4 S = mat4_scale(1.0f / transform->scale);
 	return mat4_multiply(mat4_multiply(R, S), T);

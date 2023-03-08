@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 #include <math.h>
 
 #include <glad/gl.h>
@@ -43,10 +44,10 @@ init_cone(int tessel)
 
 	for (int v = 0; v < tessel; v++) {
 		float angle = 2.0f * M_PI * v / tessel;
-		verts[v] = (Tin_Vec3) {{ cosf(angle), 0.5f, sinf(angle) }};
+		verts[v] = (Tin_Vec3){{ cosf(angle), 0.5f, sinf(angle) }};
 	}
-	verts[tessel + 0] = (Tin_Vec3) {{ 0.0f, -1.5f, 0.0f }};
-	verts[tessel + 1] = (Tin_Vec3) {{ 0.0f, 0.5f, 0.0f }};
+	verts[tessel + 0] = (Tin_Vec3){{ 0.0f, -1.5f, 0.0f }};
+	verts[tessel + 1] = (Tin_Vec3){{ 0.0f, 0.5f, 0.0f }};
 
 	for (int v = 0; v < tessel; v++) {
 		int w = (v + 1) % tessel;
@@ -110,7 +111,7 @@ static Camera *cam = &camera;
 static void
 key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
-	(void) scancode, (void) mods;
+	(void)scancode, (void)mods;
 
 	if (action == GLFW_REPEAT) return;
 	
@@ -151,12 +152,11 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 
 	case GLFW_KEY_SPACE:
 		if (action == GLFW_PRESS) {
-			Tin_Vec3 forward = tin_apply_qt(cam->quat, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }});
+			Tin_Vec3 forward = {{ -cam->rotation[6], -cam->rotation[7], -cam->rotation[8] }};
 			Tin_Body *body = tin_add_body(&scene);
 			*body = (Tin_Body) {
 				body->node,
 				{
-					cam->quat,
 					{ 0 },
 					tin_saxpy_v3(1.0f, forward, cam->position),
 					0.2f,
@@ -167,6 +167,7 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 				{{ 0.0f, 0.0f, 0.0f }},
 				{ 0 }
 			};
+			memcpy(body->transform.rotation, cam->rotation, sizeof cam->rotation);
 			objects[num_objects++] = (Object) {
 				body,
 				&cube_model,
@@ -180,7 +181,7 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 static void
 mouse_callback(GLFWwindow *window, double x, double y)
 {
-	(void) window;
+	(void)window;
 
 	int mode = glfwGetInputMode(window, GLFW_CURSOR);
 	if (mode != GLFW_CURSOR_DISABLED) return;
@@ -211,13 +212,13 @@ mouse_callback(GLFWwindow *window, double x, double y)
 void *
 custom_alloc(void *userPointer)
 {
-	return malloc((size_t) userPointer);
+	return malloc((size_t)userPointer);
 }
 
 void
 custom_free(void *userPointer, void *memoryPointer)
 {
-	(void) userPointer;
+	(void)userPointer;
 	free(memoryPointer);
 }
 
@@ -242,7 +243,7 @@ main(void)
 	init_cone(16);
 	init_cube();
 
-	camera.quat = (Tin_Quat) { {{ 0.0f, 0.0f, 0.0f }}, 1.0f };
+	memcpy(camera.rotation, (Tin_Scalar[]){ 1, 0, 0, 0, 1, 0, 0, 0, 1 }, sizeof camera.rotation);
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
 	camera.position.c[2] = 5.0f;
 
@@ -254,12 +255,11 @@ main(void)
 	scene.jointAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Joint), custom_alloc, custom_free };
 
 	Tin_Body *body1 = tin_add_body(&scene);
-	*body1 = (Tin_Body) {
+	*body1 = (Tin_Body){
 		body1->node,
 		{
-			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-			{ 0 },
-			(Tin_Vec3) {{ 0.0f, 1.5f, 0.0f }},
+			{ 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+			(Tin_Vec3){{ 0.0f, 1.5f, 0.0f }},
 			1.0f
 		},
 		&cone_shape,
@@ -269,19 +269,18 @@ main(void)
 		{{ 0.0f, 0.0f, 0.0f }},
 		{ 0 }
 	};
-	objects[num_objects++] = (Object) {
+	objects[num_objects++] = (Object){
 		body1,
 		&cone_model,
 		{{ 0.5f, 1.0f, 0.5f }}
 	};
 
 	Tin_Body *body2 = tin_add_body(&scene);
-	*body2 = (Tin_Body) {
+	*body2 = (Tin_Body){
 		body2->node,
 		{
-			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-			{ 0 },
-			(Tin_Vec3) {{ 0.0f, -1.0f, 0.0f }},
+			{ 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+			(Tin_Vec3){{ 0.0f, -1.0f, 0.0f }},
 			1.0f
 		},
 		&cube_shape,
@@ -291,18 +290,17 @@ main(void)
 		//{{ 0.1f, 0.1f, 0.0f }},
 		{ 0 }
 	};
-	objects[num_objects++] = (Object) {
+	objects[num_objects++] = (Object){
 		body2,
 		&cube_model,
 		{{ 1.0f, 0.5f, 0.5f }}
 	};
 
 	Tin_Body *body3 = tin_add_body(&scene);
-	*body3 = (Tin_Body) {
+	*body3 = (Tin_Body){
 		body3->node,
 		{
-			tin_make_qt((Tin_Vec3) {{ 0.0f, 1.0f, 0.0f }}, 0.0f),
-			{ 0 },
+			{ 1, 0, 0, 0, 1, 0, 0, 0, 1 },
 			(Tin_Vec3) {{ 0.0f, -23.0f, 0.0f }},
 			20.0f
 		},
@@ -312,7 +310,7 @@ main(void)
 		{{ 0.0f, 0.0f, 0.0f }},
 		{ 0 }
 	};
-	objects[num_objects++] = (Object) {
+	objects[num_objects++] = (Object){
 		body3,
 		&cube_model,
 		{{ 1.0f, 1.0f, 1.0f }}
@@ -340,7 +338,7 @@ main(void)
 		Tin_Transform camtrf;
 		camera_transform(&camera, &camtrf);
 
-		Tin_Transform ident = { .quaternion = { {{ 0.0f, 0.0f, 0.0f }}, 1.0f }, .scale = 1.0f };
+		Tin_Transform ident = { .rotation = { 1, 0, 0, 0, 1, 0, 0, 0, 1 }, .scale = 1.0f };
 
 		render_start_models();
 		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);

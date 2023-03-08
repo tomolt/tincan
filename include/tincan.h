@@ -52,16 +52,10 @@ Tin_Scalar tin_length_v3(Tin_Vec3 v);
 Tin_Vec3 tin_normalize_v3(Tin_Vec3 v);
 Tin_Vec3 tin_hadamard_v3(Tin_Vec3 a, Tin_Vec3 b);
 
-/* Quaternions */
-
-struct Tin_Quat { Tin_Vec3 v; Tin_Scalar s; };
-typedef struct Tin_Quat Tin_Quat;
-
-Tin_Quat tin_make_qt (Tin_Vec3 axis, Tin_Scalar angle);
-Tin_Quat tin_mul_qt  (Tin_Quat a, Tin_Quat b);
-Tin_Vec3 tin_apply_qt(Tin_Quat q, Tin_Vec3 v);
-Tin_Quat tin_conjugate_qt(Tin_Quat q);
-void tin_qt_to_matrix(Tin_Quat q, Tin_Scalar matrix[3*3]);
+void tin_axis_angle_to_matrix(Tin_Vec3 axis, Tin_Scalar angle, Tin_Scalar matrix[3*3]);
+void tin_m3_times_m3(Tin_Scalar result[3*3], const Tin_Scalar matrixA[3*3], const Tin_Scalar matrixB[3*3]);
+void tin_m3_times_m3_transposed(Tin_Scalar result[3*3], const Tin_Scalar matrixA[3*3], const Tin_Scalar matrixB[3*3]);
+Tin_Vec3 tin_m3_times_v3(const Tin_Scalar matrix[3*3], Tin_Vec3 vector);
 
 /* Geometric Functions */
 
@@ -71,7 +65,6 @@ Tin_Scalar tin_prlgram_area(Tin_Vec3 e1, Tin_Vec3 e2);
 /* Transforms */
 
 typedef struct {
-	Tin_Quat   quaternion; // TODO remove
 	Tin_Scalar rotation[3*3];
 	Tin_Vec3   translation;
 	Tin_Scalar scale;
