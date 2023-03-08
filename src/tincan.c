@@ -2,7 +2,7 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <math.h>
+#include <tgmath.h>
 
 #include <stdlib.h> // abort()
 
@@ -58,7 +58,7 @@ tin_dot_v3(Tin_Vec3 a, Tin_Vec3 b)
 Tin_Scalar
 tin_length_v3(Tin_Vec3 v)
 {
-	return sqrtf(tin_dot_v3(v, v));
+	return sqrt(tin_dot_v3(v, v));
 }
 
 Tin_Vec3
@@ -82,7 +82,7 @@ Tin_Quat
 tin_make_qt(Tin_Vec3 axis, Tin_Scalar angle)
 {
 	Tin_Scalar h = angle / 2.0f;
-	return (Tin_Quat) { tin_scale_v3(sinf(h), axis), cosf(h) };
+	return (Tin_Quat) { tin_scale_v3(sin(h), axis), cos(h) };
 }
 
 Tin_Quat
@@ -138,6 +138,32 @@ tin_qt_to_matrix(Tin_Quat q, Tin_Scalar matrix[3*3])
 	matrix[8] = 1.0f - 2.0f * (ii + jj);
 }
 
+void
+tin_axis_angle_to_matrix(Tin_Vec3 axis, Tin_Scalar angle, Tin_Scalar matrix[3*3])
+{
+	Tin_Scalar cosAngle = cos(angle);
+	Tin_Scalar sinAngle = sin(angle);
+	Tin_Scalar antiCos = 1.0f - cosAngle;
+
+	Tin_Scalar xyAntiCos = axis.c[0] * axis.c[1] * antiCos;
+	Tin_Scalar yzAntiCos = axis.c[1] * axis.c[2] * antiCos;
+	Tin_Scalar zxAntiCos = axis.c[2] * axis.c[0] * antiCos;
+
+	Tin_Scalar xSin = axis.c[0] * sinAngle;
+	Tin_Scalar ySin = axis.c[1] * sinAngle;
+	Tin_Scalar zSin = axis.c[2] * sinAngle;
+
+	matrix[0] = cosAngle + axis.c[0] * axis.c[0] * antiCos;
+	matrix[1] = xyAntiCos + zSin;
+	matrix[2] = zxAntiCos - ySin;
+	matrix[3] = xyAntiCos - zSin;
+	matrix[4] = cosAngle + axis.c[1] * axis.c[1] * antiCos;
+	matrix[5] = yzAntiCos + xSin;
+	matrix[6] = zxAntiCos + ySin;
+	matrix[7] = yzAntiCos - xSin;
+	matrix[8] = cosAngle + axis.c[2] * axis.c[2] * antiCos;
+}
+
 Tin_Vec3
 tin_gram_schmidt(Tin_Vec3 fixed, Tin_Vec3 var)
 {
@@ -153,7 +179,7 @@ Tin_Scalar
 tin_prlgram_area(Tin_Vec3 e1, Tin_Vec3 e2)
 {
 	Tin_Vec3 perp = tin_gram_schmidt(e1, e2);
-	return sqrtf(tin_dot_v3(e1, e1) * tin_dot_v3(perp, perp));
+	return sqrt(tin_dot_v3(e1, e1) * tin_dot_v3(perp, perp));
 }
 
 Tin_Vec3
@@ -404,7 +430,7 @@ tin_polytope_collide(
 	Tin_Ray r;
 	r.origin = tin_sub_v3(ta->translation, tb->translation);
 	r.dir    = tin_neg_v3(r.origin);
-	Tin_Scalar norm = sqrtf(tin_dot_v3(r.dir, r.dir));
+	Tin_Scalar norm = sqrt(tin_dot_v3(r.dir, r.dir));
 	if (norm == 0.0f) {
 		/* FIXME */
 		return 1;
@@ -804,7 +830,7 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 			body->transform.translation = tin_saxpy_v3(dt, body->velocity, body->transform.translation);
 		}
 		
-		Tin_Scalar angle = sqrtf(tin_dot_v3(body->angularVelocity, body->angularVelocity));
+		Tin_Scalar angle = sqrt(tin_dot_v3(body->angularVelocity, body->angularVelocity));
 		
 		if (fabs(angle) > 100.0f * TIN_EPSILON) {
 			body->transform.quaternion = tin_mul_qt(
