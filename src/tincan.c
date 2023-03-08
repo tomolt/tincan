@@ -665,9 +665,9 @@ tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 
 		tin_enforce_jacobian(arbiter->body1, arbiter->body2, contact->jacobian, contact->effectiveMass[0], contact->bias, &contact->ineqAccum, 0.0f, INFINITY);
 
-		Tin_Vec3 r1 = tin_apply_qt(arbiter->body1->transform.quaternion,
+		Tin_Vec3 r1 = tin_fwtrf_dir(&arbiter->body1->transform,
 			tin_scale_v3(arbiter->body1->transform.scale, contact->rel1));
-		Tin_Vec3 r2 = tin_apply_qt(arbiter->body2->transform.quaternion,
+		Tin_Vec3 r2 = tin_fwtrf_dir(&arbiter->body2->transform,
 			tin_scale_v3(arbiter->body2->transform.scale, contact->rel2));
 
 		Tin_Vec3 tangent1 = tin_gram_schmidt(contact->normal, (Tin_Vec3){{ 1.0f, 0.0f, 0.0f }});
@@ -705,9 +705,9 @@ tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 	Tin_Vec3 p1 = tin_fwtrf_point(&joint->body1->transform, joint->relTo1);
 	Tin_Vec3 p2 = tin_fwtrf_point(&joint->body2->transform, joint->relTo2);
 
-	Tin_Vec3 r1 = tin_apply_qt(joint->body1->transform.quaternion,
+	Tin_Vec3 r1 = tin_fwtrf_dir(&joint->body1->transform,
 		tin_scale_v3(joint->body1->transform.scale, joint->relTo1));
-	Tin_Vec3 r2 = tin_apply_qt(joint->body2->transform.quaternion,
+	Tin_Vec3 r2 = tin_fwtrf_dir(&joint->body2->transform,
 		tin_scale_v3(joint->body2->transform.scale, joint->relTo2));
 
 	separation = p2.c[0] - p1.c[0];
