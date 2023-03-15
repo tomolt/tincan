@@ -814,6 +814,42 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 	}
 }
 
+tin_create_arbiter()
+{
+	if (capac * 100 < count * 80) {
+	}
+	slot = hash;
+	loop {
+		slot %= ;
+
+		Tin_Arbiter temp = arbiters[slot];
+		arbiters[slot] = arbiter;
+		arbiter = temp;
+		
+		if (vacant(arbiter)) break;
+
+		slot++;
+	}
+}
+
+tin_delete_arbiter()
+{
+	if (capac > count * X) {
+	}
+	slot = hash;
+	loop {
+		slot %= ;
+
+		if (vacant(arbiter)) break;
+
+		Tin_Arbiter temp = arbiters[slot];
+		arbiters[slot] = arbiter;
+		arbiter = temp;
+
+		slot++;
+	}
+}
+
 Tin_Collision *
 tin_broadphase(Tin_Scene *scene, size_t *count_out)
 {
