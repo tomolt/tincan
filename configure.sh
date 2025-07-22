@@ -57,8 +57,8 @@ ${SUBPROJ}_clean:
 END
 }
 
-var_default "CC" "gcc"
-var_default "LD" "gcc"
+var_default "CC" "cc"
+var_default "LD" "cc"
 var_default "AR" "ar"
 var_default "CFLAGS" "-g -Wall -Wextra -pedantic -fsanitize=undefined -std=gnu11"
 var_default "LDFLAGS" "-g -Wall -Wextra -pedantic -fsanitize=undefined -std=gnu11"
