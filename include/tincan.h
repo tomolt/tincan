@@ -1,3 +1,9 @@
+/* tincan physics engine
+ *
+ * Copyright 2021-2025 Thomas Oltmann
+ * All rights reserved
+ */
+
 #ifndef TINCAN_PHYSICS_H
 #define TINCAN_PHYSICS_H
 

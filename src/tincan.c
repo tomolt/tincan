@@ -1,3 +1,9 @@
+/* tincan physics engine
+ *
+ * Copyright 2021-2025 Thomas Oltmann
+ * All rights reserved
+ */
+
 #include "tincan.h"
 
 #include <string.h>
