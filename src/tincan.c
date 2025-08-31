@@ -8,14 +8,13 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <tgmath.h>
-#include <stdbool.h>
-#include <stdint.h>
-
 #include <stdlib.h>
+#include <tgmath.h>
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
+
+/* === Vector Math === :vec: */
 
 #define M3(matrix,row,column) (matrix[(row)+3*(column)])
 
@@ -184,6 +183,8 @@ tin_prlgram_area(Tin_Vec3 e1, Tin_Vec3 e2)
 	return sqrt(tin_dot_v3(e1, e1) * tin_dot_v3(perp, perp));
 }
 
+/* === Transforms === :trf: */
+
 Tin_Vec3
 tin_fwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec)
 {
@@ -214,6 +215,8 @@ tin_bwtrf_dir(const Tin_Transform *transform, Tin_Vec3 vec)
 	return tin_v3_times_m3(vec, transform->rotation);
 }
 
+/* === Polytopes === :poly: */
+
 Tin_Vec3
 tin_polytope_support(const Tin_Polytope *polytope, Tin_Vec3 dir)
 {
@@ -242,6 +245,8 @@ tin_polysum_support(const Tin_Polysum *s, Tin_Vec3 dir, Tin_Pspoint *sup)
 
 	sup->abs = tin_sub_v3(former_abs, latter_abs);
 }
+
+/* === Minkowski Portal Refinement === :mpr: */
 
 int
 tin_construct_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
@@ -369,6 +374,8 @@ tin_refine_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
 		}
 	}
 }
+
+/* === Contact Points === :contact: */
 
 void
 tin_calculate_contact(const Tin_Ray *r, const Tin_Portal *p, Tin_Contact *contact)
@@ -908,11 +915,21 @@ tin_add_joint(Tin_Scene *scene)
 	return joint;
 }
 
-struct BodyList {
-	struct BodyList *next;
-	size_t bodyIdx;
-};
+void
+tin_update_aabb(Tin_Body *body)
+{
+	// TODO reuse back-transformed cardinal direction vectors
+	body->aabbMin.c[0] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{ -1.0, 0.0, 0.0 }})).c[0];
+	body->aabbMin.c[1] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  0.0,-1.0, 0.0 }})).c[1];
+	body->aabbMin.c[2] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  0.0, 0.0,-1.0 }})).c[2];
+	body->aabbMax.c[0] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  1.0, 0.0, 0.0 }})).c[0];
+	body->aabbMax.c[1] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  0.0, 1.0, 0.0 }})).c[1];
+	body->aabbMax.c[2] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  0.0, 0.0, 1.0 }})).c[2];
+}
 
+/* === Broadphase === :broad: */
+
+#if 0
 struct Endpoint {
 	size_t bodyIdx;
 	Tin_Scalar value;
@@ -920,9 +937,8 @@ struct Endpoint {
 };
 
 struct Broadphase {
-	struct Endpoint *axes[3];
-	struct BodyList **touching;
 	size_t numBodies;
+	struct Endpoint *axes[3];
 };
 
 void
@@ -956,8 +972,13 @@ void
 tin_update_broadphase(struct Broadphase *broad)
 {
 	(void) broad;
+	for () {
+		Tin_Body *body = tin_body_pointer(scene, index);
+	}
 }
+#endif
 
+#if 0
 void
 tin_sort_axis(struct Broadphase *broad, int axisNum)
 {
@@ -1010,20 +1031,9 @@ tin_scan_axis(struct Broadphase *broad, int axisNum)
 
 	free(active);
 }
+#endif
 
-typedef struct {
-	size_t   elemLow;
-	size_t   elemHigh;
-	void    *payload;
-	uint32_t hash;
-	bool     occupied;
-} Tin_PairTableSlot;
-
-typedef struct {
-	Tin_PairTableSlot *slots;
-	size_t count;
-	size_t capac;
-} Tin_PairTable;
+/* === Pair-Indexed Hashtable === :pair: */
 
 void
 tin_create_pairtable(Tin_PairTable *table)
@@ -1037,6 +1047,13 @@ void
 tin_destroy_pairtable(Tin_PairTable *table)
 {
 	free(table->slots);
+}
+
+void
+tin_reset_pairtable(Tin_PairTable *table)
+{
+	table->count = 0;
+	memset(table->slots, 0, table->capac * sizeof *table->slots);
 }
 
 /* Capacity has to be a power of two.

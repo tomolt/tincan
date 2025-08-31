@@ -8,10 +8,11 @@
 #define TINCAN_PHYSICS_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h> /* for offsetof */
 #include <float.h>
 
-/* Linked List */
+/* === Linked List === :list: */
 
 typedef struct Tin_List Tin_List;
 
@@ -31,7 +32,7 @@ struct Tin_List {
 	     elem = TIN_CONTAINER_OF(_node = _node->next, type, member))
 #define TIN_FOR_EACH(elem, list, type, member) TIN_FOR_RANGE(elem, list, list, type, member)
 
-/* Customizable Allocators */
+/* === Customizable Allocators === :alloc: */
 
 typedef struct {
 	void *userPointer;
@@ -39,7 +40,7 @@ typedef struct {
 	void (*free)(void *userPointer, void *memoryPointer);
 } Tin_Allocator;
 
-/* 3D Vectors */
+/* === Vector Math === :vec: */
 
 #define TIN_EPSILON FLT_EPSILON
 typedef float Tin_Scalar;
@@ -63,12 +64,10 @@ void tin_m3_times_m3(Tin_Scalar result[3*3], const Tin_Scalar matrixA[3*3], cons
 void tin_m3_times_m3_transposed(Tin_Scalar result[3*3], const Tin_Scalar matrixA[3*3], const Tin_Scalar matrixB[3*3]);
 Tin_Vec3 tin_m3_times_v3(const Tin_Scalar matrix[3*3], Tin_Vec3 vector);
 
-/* Geometric Functions */
-
 Tin_Vec3   tin_gram_schmidt(Tin_Vec3 fixed, Tin_Vec3 var);
 Tin_Scalar tin_prlgram_area(Tin_Vec3 e1, Tin_Vec3 e2);
 
-/* Transforms */
+/* === Transforms === :trf: */
 
 typedef struct {
 	Tin_Scalar rotation[3*3];
@@ -81,7 +80,7 @@ Tin_Vec3 tin_fwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
 Tin_Vec3 tin_bwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec);
 Tin_Vec3 tin_bwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
 
-/* Polytopes */
+/* === Polytopes === :poly: */
 
 typedef struct {
 	Tin_Vec3  *vertices;
@@ -90,7 +89,7 @@ typedef struct {
 
 Tin_Vec3 tin_polytope_support(const Tin_Polytope *polytope, Tin_Vec3 dir);
 
-/* Shapes */
+/* === Shapes === :shape: */
 
 #define TIN_SPHERE   's'
 #define TIN_POLYTOPE 'p'
@@ -104,7 +103,7 @@ typedef struct {
 	};
 } Tin_Shape;
 
-/* Rigid Bodies */
+/* === Rigid Bodies === :body: */
 
 typedef struct {
 	Tin_List      node;
@@ -118,7 +117,8 @@ typedef struct {
 	Tin_Vec3      aabbMax;
 } Tin_Body;
 
-/* Minkowski sum (difference) of transformed convex polytopes */
+/* === Minkowski Sum === :mink: */
+/* (difference of transformed convex polytopes) */
 typedef struct {
 	const Tin_Polytope  *polytope1;
 	const Tin_Transform *transform1;
@@ -126,7 +126,7 @@ typedef struct {
 	const Tin_Transform *transform2;
 } Tin_Polysum;
 
-/* A point in a polytope sum */
+/* === A point in a polytope sum === :psum: */
 typedef struct {
 	Tin_Vec3 abs;
 	Tin_Vec3 relTo1;
@@ -135,7 +135,7 @@ typedef struct {
 
 void tin_polysum_support(const Tin_Polysum *s, Tin_Vec3 dir, Tin_Pspoint *sup);
 
-/* MPR */
+/* === Minkowski Portal Refinement === :mpr: */
 
 typedef struct {
 	Tin_Vec3 origin;
@@ -155,7 +155,7 @@ typedef struct {
 int  tin_construct_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p);
 void tin_refine_portal   (const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p);
 
-/* Contact Points */
+/* === Contact Points === :contact: */
 
 typedef struct {
 	Tin_Vec3   rel1;
@@ -227,5 +227,33 @@ void tin_simulate(Tin_Scene *scene, Tin_Scalar dt);
 Tin_Body *tin_add_body(Tin_Scene *scene);
 Tin_Arbiter *tin_add_arbiter(Tin_Scene *scene);
 Tin_Joint *tin_add_joint(Tin_Scene *scene);
+
+/* === Pair-Indexed Hashtable === :pair: */
+
+typedef struct {
+	size_t   elemLow;
+	size_t   elemHigh;
+	void    *payload;
+	uint32_t hash;
+	bool     occupied;
+} Tin_PairTableSlot;
+
+typedef struct {
+	Tin_PairTableSlot *slots;
+	size_t count;
+	size_t capac;
+} Tin_PairTable;
+
+void tin_create_pairtable(Tin_PairTable *table);
+void tin_destroy_pairtable(Tin_PairTable *table);
+void tin_reset_pairtable(Tin_PairTable *table);
+void tin_resize_pairtable(Tin_PairTable *table, size_t newCapac);
+void tin_order_pair(size_t *elemLow, size_t *elemHigh);
+uint32_t tin_hash_pair(size_t elemLow, size_t elemHigh);
+size_t tin_fold_hash(size_t capac, uint32_t hash);
+size_t tin_pairtable_index(Tin_PairTable *table, size_t elemLow, size_t elemHigh);
+bool tin_find_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void **payloadOut);
+void tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload);
+void tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB);
 
 #endif
