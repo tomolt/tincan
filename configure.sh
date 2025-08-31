@@ -6,7 +6,7 @@ PROJ_BUILD=$(pwd)
 MAKEFILE="$PROJ_BUILD/Makefile"
 
 var_default() {
-	[ -z ${!1} ] && eval "$1=\$2"
+	[ -z "${!1}" ] && eval "$1=\$2"
 }
 
 add_var() {
