@@ -165,7 +165,9 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 				1.0f / 1.0f,
 				tin_scale_v3(5.0f, forward),
 				{{ 0.0f, 0.0f, 0.0f }},
-				{ 0 }
+				{ 0 },
+				{{ 0.0f, 0.0f, 0.0f }},
+				{{ 0.0f, 0.0f, 0.0f }},
 			};
 			memcpy(body->transform.rotation, cam->rotation, sizeof cam->rotation);
 			objects[num_objects++] = (Object) {
@@ -267,7 +269,9 @@ main(void)
 		//{{ 0.0f, 0.0f, -0.5f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
-		{ 0 }
+		{ 0 },
+		{{ 0.0f, 0.0f, 0.0f }},
+		{{ 0.0f, 0.0f, 0.0f }},
 	};
 	objects[num_objects++] = (Object){
 		body1,
@@ -288,7 +292,9 @@ main(void)
 		{{ -3.0f, 1.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
 		//{{ 0.1f, 0.1f, 0.0f }},
-		{ 0 }
+		{ 0 },
+		{{ 0.0f, 0.0f, 0.0f }},
+		{{ 0.0f, 0.0f, 0.0f }},
 	};
 	objects[num_objects++] = (Object){
 		body2,
@@ -308,7 +314,9 @@ main(void)
 		0.0f,
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
-		{ 0 }
+		{ 0 },
+		{{ 0.0f, 0.0f, 0.0f }},
+		{{ 0.0f, 0.0f, 0.0f }},
 	};
 	objects[num_objects++] = (Object){
 		body3,

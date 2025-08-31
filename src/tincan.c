@@ -9,8 +9,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <tgmath.h>
+#include <stdbool.h>
+#include <stdint.h>
 
-#include <stdlib.h> // abort()
+#include <stdlib.h>
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -638,6 +640,9 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 void
 tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
+	// TODO
+	(void)invDt;
+
 	const Tin_Scalar friction = 0.3f;
 
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
@@ -903,3 +908,263 @@ tin_add_joint(Tin_Scene *scene)
 	return joint;
 }
 
+struct BodyList {
+	struct BodyList *next;
+	size_t bodyIdx;
+};
+
+struct Endpoint {
+	size_t bodyIdx;
+	Tin_Scalar value;
+	bool isMin;
+};
+
+struct Broadphase {
+	struct Endpoint *axes[3];
+	struct BodyList **touching;
+	size_t numBodies;
+};
+
+void
+tin_create_broadphase(struct Broadphase *broad, size_t numBodies)
+{
+	broad->numBodies = numBodies;
+	broad->touching = calloc(numBodies, sizeof *broad->touching);
+	broad->axes[0] = calloc(2 * numBodies, sizeof *broad->axes[0]);
+	broad->axes[1] = calloc(2 * numBodies, sizeof *broad->axes[0]);
+	broad->axes[2] = calloc(2 * numBodies, sizeof *broad->axes[0]);
+}
+
+void
+tin_destroy_broadphase(struct Broadphase *broad)
+{
+	for (size_t b = 0; b < broad->numBodies; b++) {
+		struct BodyList *list = broad->touching[b];
+		while (list) {
+			struct BodyList *next = list->next;
+			free(list);
+			list = next;
+		}
+	}
+	free(broad->touching);
+	free(broad->axes[0]);
+	free(broad->axes[1]);
+	free(broad->axes[2]);
+}
+
+void
+tin_update_broadphase(struct Broadphase *broad)
+{
+	(void) broad;
+}
+
+void
+tin_sort_axis(struct Broadphase *broad, int axisNum)
+{
+	struct Endpoint *axis = broad->axes[axisNum];
+
+	for (size_t j, i = 1; i < 2 * broad->numBodies; i++) {
+		struct Endpoint point = axis[i];
+		for (j = i; j > 0 && axis[j-1].value > point.value; j--) {
+			axis[j] = axis[j-1];
+		}
+		axis[j] = point;
+	}
+}
+
+void
+tin_scan_axis(struct Broadphase *broad, int axisNum)
+{
+	struct Endpoint *axis = broad->axes[axisNum];
+	size_t numEndpoints = 2 * broad->numBodies;
+
+	size_t *active = calloc(numEndpoints, sizeof *active);
+	size_t numActive = 0;
+
+	for (size_t i = 0; i < numEndpoints; i++) {
+		if (axis[i].isMin) {
+			for (size_t a = 0; a < numActive; a++) {
+				size_t bodyA = active[a];
+				size_t bodyB = axis[i].bodyIdx;
+
+				struct BodyList *listNodeA = calloc(1, sizeof *listNodeA);
+				listNodeA->bodyIdx = bodyB;
+				listNodeA->next = broad->touching[bodyA];
+				broad->touching[bodyA] = listNodeA;
+
+				struct BodyList *listNodeB = calloc(1, sizeof *listNodeB);
+				listNodeB->bodyIdx = bodyA;
+				listNodeB->next = broad->touching[bodyB];
+				broad->touching[bodyB] = listNodeB;
+			}
+			active[numActive++] = axis[i].bodyIdx;
+		} else {
+			for (size_t a = 0; a < numActive; a++) {
+				if (active[a] == axis[i].bodyIdx) {
+					active[a] = active[--numActive];
+					break;
+				}
+			}
+		}
+	}
+
+	free(active);
+}
+
+typedef struct {
+	size_t   elemLow;
+	size_t   elemHigh;
+	void    *payload;
+	uint32_t hash;
+	bool     occupied;
+} Tin_PairTableSlot;
+
+typedef struct {
+	Tin_PairTableSlot *slots;
+	size_t count;
+	size_t capac;
+} Tin_PairTable;
+
+void
+tin_create_pairtable(Tin_PairTable *table)
+{
+	table->count = 0;
+	table->capac = 16;
+	table->slots = calloc(table->capac, sizeof *table->slots);
+}
+
+void
+tin_destroy_pairtable(Tin_PairTable *table)
+{
+	free(table->slots);
+}
+
+/* Capacity has to be a power of two.
+ */
+void
+tin_resize_pairtable(Tin_PairTable *table, size_t newCapac)
+{
+	void tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload);
+
+	size_t oldCapac = table->capac;
+	Tin_PairTableSlot *oldSlots = table->slots;
+
+	table->count = 0;
+	table->capac = newCapac;
+	table->slots = calloc(table->capac, sizeof *table->slots);
+
+	for (size_t i = 0; i < oldCapac; i++) {
+		if (oldSlots[i].occupied) {
+			tin_insert_pair(table, oldSlots[i].elemLow, oldSlots[i].elemHigh, oldSlots[i].payload);
+		}
+	}
+
+	free(oldSlots);
+}
+
+void
+tin_order_pair(size_t *elemLow, size_t *elemHigh)
+{
+	if (*elemLow > *elemHigh) {
+		size_t elemTmp = *elemLow;
+		*elemLow = *elemHigh;
+		*elemHigh = elemTmp;
+	}
+}
+
+uint32_t
+tin_hash_pair(size_t elemLow, size_t elemHigh)
+{
+	// TODO better hash function
+	return ((elemLow ^ (elemHigh << 16)) * 33) >> 4;
+}
+
+size_t
+tin_fold_hash(size_t capac, uint32_t hash)
+{
+	// TODO xor folding or similar
+	uint32_t mask = capac - 1;
+	return hash & mask;
+}
+
+size_t
+tin_pairtable_index(Tin_PairTable *table, size_t elemLow, size_t elemHigh)
+{
+	uint32_t hash = tin_hash_pair(elemLow, elemHigh);
+	size_t index = tin_fold_hash(table->capac, hash);
+	for (;;) {
+		if (!table->slots[index].occupied) {
+			return index;
+		}
+		if (table->slots[index].hash == hash
+		 && table->slots[index].elemLow == elemLow
+		 && table->slots[index].elemHigh == elemHigh) {
+			return index;
+		}
+		index++;
+		if (index == table->capac) {
+			index = 0;
+		}
+	}
+}
+
+bool
+tin_find_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void **payloadOut)
+{
+	tin_order_pair(&elemA, &elemB);
+	size_t index = tin_pairtable_index(table, elemA, elemB);
+	if (!table->slots[index].occupied) {
+		return false;
+	}
+	*payloadOut = table->slots[index].payload;
+	return true;
+}
+
+void
+tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload)
+{
+	if (3 * table->count >= 2 * table->capac) {
+		tin_resize_pairtable(table, 2 * table->capac);
+	}
+	tin_order_pair(&elemA, &elemB);
+	size_t index = tin_pairtable_index(table, elemA, elemB);
+	if (!table->slots[index].occupied) {
+		table->count++;
+	}
+	table->slots[index] = (Tin_PairTableSlot) {
+		elemA,
+		elemB,
+		payload,
+		tin_hash_pair(elemA, elemB),
+		true,
+	};
+}
+
+void
+tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB)
+{
+	tin_order_pair(&elemA, &elemB);
+	size_t index = tin_pairtable_index(table, elemA, elemB);
+	if (!table->slots[index].occupied) {
+		return;
+	}
+	table->count--;
+
+	for (;;) {
+		size_t next = index + 1;
+		if (next == table->capac) {
+			next = 0;
+		}
+		if (!table->slots[next].occupied) {
+			break;
+		}
+		size_t nextDesired = tin_fold_hash(table->capac, table->slots[next].hash);
+		if (next == nextDesired) {
+			break;
+		}
+		table->slots[index] = table->slots[next];
+		index = next;
+	}
+
+	table->slots[index].occupied = false;
+}
