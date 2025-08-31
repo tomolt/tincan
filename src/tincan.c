@@ -246,6 +246,36 @@ tin_polysum_support(const Tin_Polysum *s, Tin_Vec3 dir, Tin_Pspoint *sup)
 	sup->abs = tin_sub_v3(former_abs, latter_abs);
 }
 
+/* === Shapes === :shape: */
+
+void
+tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax)
+{
+	switch (shape->kind) {
+	case TIN_SPHERE:
+		*aabbMin = (Tin_Vec3){{ -1.0, -1.0, -1.0 }};
+		*aabbMax = (Tin_Vec3){{  1.0,  1.0,  1.0 }};
+		*aabbMin = tin_saxpy_v3(transform->scale, *aabbMin, transform->translation);
+		*aabbMax = tin_saxpy_v3(transform->scale, *aabbMax, transform->translation);
+		break;
+
+	case TIN_POLYTOPE:
+		// TODO reuse back-transformed cardinal direction vectors
+		aabbMin->c[0] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{ -1.0, 0.0, 0.0 }})).c[0];
+		aabbMin->c[1] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  0.0,-1.0, 0.0 }})).c[1];
+		aabbMin->c[2] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  0.0, 0.0,-1.0 }})).c[2];
+		aabbMax->c[0] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  1.0, 0.0, 0.0 }})).c[0];
+		aabbMax->c[1] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  0.0, 1.0, 0.0 }})).c[1];
+		aabbMax->c[2] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  0.0, 0.0, 1.0 }})).c[2];
+		*aabbMin = tin_fwtrf_point(transform, *aabbMin);
+		*aabbMax = tin_fwtrf_point(transform, *aabbMax);
+		break;
+	
+	default:
+		abort();
+	}
+}
+
 /* === Minkowski Portal Refinement === :mpr: */
 
 int
@@ -722,6 +752,160 @@ tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, effectiveMass, bias, NULL, 0.0f, 0.0f);
 }
 
+/* === Pair-Indexed Hashtable === :pair: */
+
+void
+tin_create_pairtable(Tin_PairTable *table)
+{
+	table->count = 0;
+	table->capac = 16;
+	table->slots = calloc(table->capac, sizeof *table->slots);
+}
+
+void
+tin_destroy_pairtable(Tin_PairTable *table)
+{
+	free(table->slots);
+}
+
+void
+tin_reset_pairtable(Tin_PairTable *table)
+{
+	table->count = 0;
+	memset(table->slots, 0, table->capac * sizeof *table->slots);
+}
+
+/* Capacity has to be a power of two.
+ */
+void
+tin_resize_pairtable(Tin_PairTable *table, size_t newCapac)
+{
+	void tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload);
+
+	size_t oldCapac = table->capac;
+	Tin_PairTableSlot *oldSlots = table->slots;
+
+	table->count = 0;
+	table->capac = newCapac;
+	table->slots = calloc(table->capac, sizeof *table->slots);
+
+	for (size_t i = 0; i < oldCapac; i++) {
+		if (oldSlots[i].occupied) {
+			tin_insert_pair(table, oldSlots[i].elemLow, oldSlots[i].elemHigh, oldSlots[i].payload);
+		}
+	}
+
+	free(oldSlots);
+}
+
+void
+tin_order_pair(size_t *elemLow, size_t *elemHigh)
+{
+	if (*elemLow > *elemHigh) {
+		size_t elemTmp = *elemLow;
+		*elemLow = *elemHigh;
+		*elemHigh = elemTmp;
+	}
+}
+
+uint32_t
+tin_hash_pair(size_t elemLow, size_t elemHigh)
+{
+	// TODO better hash function
+	return ((elemLow ^ (elemHigh << 16)) * 33) >> 4;
+}
+
+size_t
+tin_fold_hash(size_t capac, uint32_t hash)
+{
+	// TODO xor folding or similar
+	uint32_t mask = capac - 1;
+	return hash & mask;
+}
+
+size_t
+tin_pairtable_index(Tin_PairTable *table, size_t elemLow, size_t elemHigh)
+{
+	uint32_t hash = tin_hash_pair(elemLow, elemHigh);
+	size_t index = tin_fold_hash(table->capac, hash);
+	for (;;) {
+		if (!table->slots[index].occupied) {
+			return index;
+		}
+		if (table->slots[index].hash == hash
+		 && table->slots[index].elemLow == elemLow
+		 && table->slots[index].elemHigh == elemHigh) {
+			return index;
+		}
+		index++;
+		if (index == table->capac) {
+			index = 0;
+		}
+	}
+}
+
+bool
+tin_find_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void **payloadOut)
+{
+	tin_order_pair(&elemA, &elemB);
+	size_t index = tin_pairtable_index(table, elemA, elemB);
+	if (!table->slots[index].occupied) {
+		return false;
+	}
+	*payloadOut = table->slots[index].payload;
+	return true;
+}
+
+void
+tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload)
+{
+	if (3 * table->count >= 2 * table->capac) {
+		tin_resize_pairtable(table, 2 * table->capac);
+	}
+	tin_order_pair(&elemA, &elemB);
+	size_t index = tin_pairtable_index(table, elemA, elemB);
+	if (!table->slots[index].occupied) {
+		table->count++;
+	}
+	table->slots[index] = (Tin_PairTableSlot) {
+		elemA,
+		elemB,
+		payload,
+		tin_hash_pair(elemA, elemB),
+		true,
+	};
+}
+
+void
+tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB)
+{
+	tin_order_pair(&elemA, &elemB);
+	size_t index = tin_pairtable_index(table, elemA, elemB);
+	if (!table->slots[index].occupied) {
+		return;
+	}
+	table->count--;
+
+	for (;;) {
+		size_t next = index + 1;
+		if (next == table->capac) {
+			next = 0;
+		}
+		if (!table->slots[next].occupied) {
+			break;
+		}
+		size_t nextDesired = tin_fold_hash(table->capac, table->slots[next].hash);
+		if (next == nextDesired) {
+			break;
+		}
+		table->slots[index] = table->slots[next];
+		index = next;
+	}
+
+	table->slots[index].occupied = false;
+}
+/* === Scenes / Worlds === :scene: */
+
 Tin_Arbiter *
 tin_find_arbiter(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2)
 {
@@ -915,18 +1099,6 @@ tin_add_joint(Tin_Scene *scene)
 	return joint;
 }
 
-void
-tin_update_aabb(Tin_Body *body)
-{
-	// TODO reuse back-transformed cardinal direction vectors
-	body->aabbMin.c[0] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{ -1.0, 0.0, 0.0 }})).c[0];
-	body->aabbMin.c[1] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  0.0,-1.0, 0.0 }})).c[1];
-	body->aabbMin.c[2] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  0.0, 0.0,-1.0 }})).c[2];
-	body->aabbMax.c[0] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  1.0, 0.0, 0.0 }})).c[0];
-	body->aabbMax.c[1] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  0.0, 1.0, 0.0 }})).c[1];
-	body->aabbMax.c[2] = tin_polytope_support(&body->shape->polytope, tin_bwtrf_dir(&body->transform, (Tin_Vec3){{  0.0, 0.0, 1.0 }})).c[2];
-}
-
 /* === Broadphase === :broad: */
 
 #if 0
@@ -1033,155 +1205,3 @@ tin_scan_axis(struct Broadphase *broad, int axisNum)
 }
 #endif
 
-/* === Pair-Indexed Hashtable === :pair: */
-
-void
-tin_create_pairtable(Tin_PairTable *table)
-{
-	table->count = 0;
-	table->capac = 16;
-	table->slots = calloc(table->capac, sizeof *table->slots);
-}
-
-void
-tin_destroy_pairtable(Tin_PairTable *table)
-{
-	free(table->slots);
-}
-
-void
-tin_reset_pairtable(Tin_PairTable *table)
-{
-	table->count = 0;
-	memset(table->slots, 0, table->capac * sizeof *table->slots);
-}
-
-/* Capacity has to be a power of two.
- */
-void
-tin_resize_pairtable(Tin_PairTable *table, size_t newCapac)
-{
-	void tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload);
-
-	size_t oldCapac = table->capac;
-	Tin_PairTableSlot *oldSlots = table->slots;
-
-	table->count = 0;
-	table->capac = newCapac;
-	table->slots = calloc(table->capac, sizeof *table->slots);
-
-	for (size_t i = 0; i < oldCapac; i++) {
-		if (oldSlots[i].occupied) {
-			tin_insert_pair(table, oldSlots[i].elemLow, oldSlots[i].elemHigh, oldSlots[i].payload);
-		}
-	}
-
-	free(oldSlots);
-}
-
-void
-tin_order_pair(size_t *elemLow, size_t *elemHigh)
-{
-	if (*elemLow > *elemHigh) {
-		size_t elemTmp = *elemLow;
-		*elemLow = *elemHigh;
-		*elemHigh = elemTmp;
-	}
-}
-
-uint32_t
-tin_hash_pair(size_t elemLow, size_t elemHigh)
-{
-	// TODO better hash function
-	return ((elemLow ^ (elemHigh << 16)) * 33) >> 4;
-}
-
-size_t
-tin_fold_hash(size_t capac, uint32_t hash)
-{
-	// TODO xor folding or similar
-	uint32_t mask = capac - 1;
-	return hash & mask;
-}
-
-size_t
-tin_pairtable_index(Tin_PairTable *table, size_t elemLow, size_t elemHigh)
-{
-	uint32_t hash = tin_hash_pair(elemLow, elemHigh);
-	size_t index = tin_fold_hash(table->capac, hash);
-	for (;;) {
-		if (!table->slots[index].occupied) {
-			return index;
-		}
-		if (table->slots[index].hash == hash
-		 && table->slots[index].elemLow == elemLow
-		 && table->slots[index].elemHigh == elemHigh) {
-			return index;
-		}
-		index++;
-		if (index == table->capac) {
-			index = 0;
-		}
-	}
-}
-
-bool
-tin_find_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void **payloadOut)
-{
-	tin_order_pair(&elemA, &elemB);
-	size_t index = tin_pairtable_index(table, elemA, elemB);
-	if (!table->slots[index].occupied) {
-		return false;
-	}
-	*payloadOut = table->slots[index].payload;
-	return true;
-}
-
-void
-tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload)
-{
-	if (3 * table->count >= 2 * table->capac) {
-		tin_resize_pairtable(table, 2 * table->capac);
-	}
-	tin_order_pair(&elemA, &elemB);
-	size_t index = tin_pairtable_index(table, elemA, elemB);
-	if (!table->slots[index].occupied) {
-		table->count++;
-	}
-	table->slots[index] = (Tin_PairTableSlot) {
-		elemA,
-		elemB,
-		payload,
-		tin_hash_pair(elemA, elemB),
-		true,
-	};
-}
-
-void
-tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB)
-{
-	tin_order_pair(&elemA, &elemB);
-	size_t index = tin_pairtable_index(table, elemA, elemB);
-	if (!table->slots[index].occupied) {
-		return;
-	}
-	table->count--;
-
-	for (;;) {
-		size_t next = index + 1;
-		if (next == table->capac) {
-			next = 0;
-		}
-		if (!table->slots[next].occupied) {
-			break;
-		}
-		size_t nextDesired = tin_fold_hash(table->capac, table->slots[next].hash);
-		if (next == nextDesired) {
-			break;
-		}
-		table->slots[index] = table->slots[next];
-		index = next;
-	}
-
-	table->slots[index].occupied = false;
-}

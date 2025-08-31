@@ -103,6 +103,8 @@ typedef struct {
 	};
 } Tin_Shape;
 
+void tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax);
+
 /* === Rigid Bodies === :body: */
 
 typedef struct {
@@ -206,28 +208,6 @@ typedef struct {
 
 void tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt);
 
-typedef struct {
-	Tin_List bodies;
-	Tin_List arbiters;
-	Tin_List joints;
-	Tin_Allocator bodyAllocator;
-	Tin_Allocator arbiterAllocator;
-	Tin_Allocator jointAllocator;
-} Tin_Scene;
-
-Tin_Arbiter *tin_find_arbiter(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2);
-void tin_scene_update(Tin_Scene *scene);
-void tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2);
-void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt);
-void tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt);
-void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
-Tin_Collision * tin_broadphase(Tin_Scene *scene, size_t *count_out);
-void tin_simulate(Tin_Scene *scene, Tin_Scalar dt);
-
-Tin_Body *tin_add_body(Tin_Scene *scene);
-Tin_Arbiter *tin_add_arbiter(Tin_Scene *scene);
-Tin_Joint *tin_add_joint(Tin_Scene *scene);
-
 /* === Pair-Indexed Hashtable === :pair: */
 
 typedef struct {
@@ -255,5 +235,29 @@ size_t tin_pairtable_index(Tin_PairTable *table, size_t elemLow, size_t elemHigh
 bool tin_find_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void **payloadOut);
 void tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload);
 void tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB);
+
+/* === Scenes / Worlds === :scene: */
+
+typedef struct {
+	Tin_List bodies;
+	Tin_List arbiters;
+	Tin_List joints;
+	Tin_Allocator bodyAllocator;
+	Tin_Allocator arbiterAllocator;
+	Tin_Allocator jointAllocator;
+} Tin_Scene;
+
+Tin_Arbiter *tin_find_arbiter(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2);
+void tin_scene_update(Tin_Scene *scene);
+void tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2);
+void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt);
+void tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt);
+void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
+Tin_Collision *tin_broadphase(Tin_Scene *scene, size_t *count_out);
+void tin_simulate(Tin_Scene *scene, Tin_Scalar dt);
+
+Tin_Body *tin_add_body(Tin_Scene *scene);
+Tin_Arbiter *tin_add_arbiter(Tin_Scene *scene);
+Tin_Joint *tin_add_joint(Tin_Scene *scene);
 
 #endif
