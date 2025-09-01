@@ -172,6 +172,9 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 				{ 0 },
 				{{ 0.0f, 0.0f, 0.0f }},
 				{{ 0.0f, 0.0f, 0.0f }},
+				NULL,
+				false,
+				false,
 			};
 			memcpy(body->transform.rotation, cam->rotation, sizeof cam->rotation);
 			objects[num_objects++] = (Object) {
@@ -276,6 +279,9 @@ main(void)
 		{ 0 },
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
+		NULL,
+		false,
+		false,
 	};
 	objects[num_objects++] = (Object){
 		body1,
@@ -299,6 +305,9 @@ main(void)
 		{ 0 },
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
+		NULL,
+		false,
+		false,
 	};
 	objects[num_objects++] = (Object){
 		body2,
@@ -321,6 +330,9 @@ main(void)
 		{ 0 },
 		{{ 0.0f, 0.0f, 0.0f }},
 		{{ 0.0f, 0.0f, 0.0f }},
+		NULL,
+		false,
+		false,
 	};
 	objects[num_objects++] = (Object){
 		body3,
@@ -425,7 +437,11 @@ main(void)
 				color = (Tin_Vec3) {{ 1.0f, 1.0f, 1.0f }};
 			}
 #endif
-			render_draw_model(obj->model, &obj->body->transform, obj->color);
+			Tin_Vec3 color = obj->color;
+			if (tin_island_find(obj->body)->islandStable && obj->body->invMass != 0.0) {
+				color = tin_saxpy_v3(0.5, color, TIN_VEC3(0.5, 0.5, 0.5));
+			}
+			render_draw_model(obj->model, &obj->body->transform, color);
 		}
 
 		render_proj_matrix = mat4_orthographic(width, height);

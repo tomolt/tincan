@@ -680,6 +680,10 @@ tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	// TODO
 	(void)invDt;
 
+	const Tin_Body *islandA = tin_island_find(arbiter->body1);
+	const Tin_Body *islandB = tin_island_find(arbiter->body2);
+	if (islandA->islandStable && islandB->islandStable) return;
+
 	const Tin_Scalar friction = 0.3f;
 
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
@@ -904,6 +908,53 @@ tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB)
 
 	table->slots[index].occupied = false;
 }
+
+/* === Island Detection & Freezing === :island: */
+
+Tin_Body *
+tin_island_find(Tin_Body *body)
+{
+	Tin_Body *island = body;
+	while (island->island != island) {
+		island = island->island;
+	}
+	if (body->island != island) {
+		body->island = island;
+	}
+	return body;
+}
+
+void
+tin_island_union(Tin_Body *bodyA, Tin_Body *bodyB)
+{
+	bodyA = tin_island_find(bodyA);
+	bodyB = tin_island_find(bodyB);
+	bodyB->island = bodyA;
+}
+
+void
+tin_build_islands(Tin_Scene *scene, const Tin_Collision *collisions, size_t numCollisions)
+{
+	{
+		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+			body->island = body;
+			body->islandStable = true;
+		}
+	}
+
+	for (size_t c = 0; c < numCollisions; c++) {
+		tin_island_union(collisions[c].bodyA, collisions[c].bodyB);
+	}
+
+	{
+		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+			if (body->stable) continue;
+			Tin_Body *island = tin_island_find(body);
+			island->islandStable = false;
+		}
+	}
+}
+
 /* === Scenes / Worlds === :scene: */
 
 Tin_Arbiter *
@@ -994,13 +1045,16 @@ void
 tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 {
 	TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+		bool stable = true;
+
 		if (tin_dot_v3(body->velocity, body->velocity) > 10000.0f * TIN_EPSILON) {
 			body->transform.translation = tin_saxpy_v3(dt, body->velocity, body->transform.translation);
+			stable = false;
 		}
 		
 		Tin_Scalar angle = sqrt(tin_dot_v3(body->angularVelocity, body->angularVelocity));
 		
-		if (fabs(angle) > 100.0f * TIN_EPSILON) {
+		if (fabs(angle) > 0.01) {
 			Tin_Scalar change[3*3];
 			tin_axis_angle_to_matrix(tin_normalize_v3(body->angularVelocity), angle * dt, change);
 
@@ -1008,10 +1062,17 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 			memcpy(copyOfRotation, body->transform.rotation, sizeof copyOfRotation);
 			
 			tin_m3_times_m3(body->transform.rotation, change, copyOfRotation);
+
+			stable = false;
 		}
 
-		if (body->invMass != 0.0f) {
-			body->velocity = tin_saxpy_v3(dt, (Tin_Vec3) {{ 0.0f, -2.0f, 0.0f }}, body->velocity);
+		if (body->invMass == 0.0f) {
+			body->stable = true;
+		} else {
+			body->stable = stable;
+			if (!body->stable) {
+				body->velocity = tin_saxpy_v3(dt, (Tin_Vec3) {{ 0.0f, -2.0f, 0.0f }}, body->velocity);
+			}
 		}
 	}
 }
@@ -1071,6 +1132,7 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 		startTime = gettime ? gettime() : 0.0;
 		size_t num_collisions;
 		Tin_Collision *collisions = tin_broadphase(scene, &num_collisions);
+		tin_build_islands(scene, collisions, num_collisions);
 		stopTime = gettime ? gettime() : 0.0;
 		if (timings) timings[1] += stopTime - startTime;
 

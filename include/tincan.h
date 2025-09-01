@@ -109,7 +109,8 @@ void tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_
 
 /* === Rigid Bodies === :body: */
 
-typedef struct {
+typedef struct Tin_Body Tin_Body;
+struct Tin_Body {
 	Tin_List      node;
 	Tin_Transform transform;
 	const Tin_Shape *shape;
@@ -119,7 +120,10 @@ typedef struct {
 	Tin_Scalar    invInertia[3*3];
 	Tin_Vec3      aabbMin;
 	Tin_Vec3      aabbMax;
-} Tin_Body;
+	Tin_Body     *island;
+	bool          stable;
+	bool          islandStable;
+};
 
 /* === Minkowski Sum === :mink: */
 /* (difference of transformed convex polytopes) */
@@ -238,9 +242,17 @@ bool tin_find_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void **payl
 void tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload);
 void tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB);
 
+/* === Island Detection & Freezing === :island: */
+
+typedef struct Tin_Scene Tin_Scene;
+
+Tin_Body *tin_island_find(Tin_Body *body);
+void tin_island_union(Tin_Body *bodyA, Tin_Body *bodyB);
+void tin_build_islands(Tin_Scene *scene, const Tin_Collision *collisions, size_t numCollisions);
+
 /* === Scenes / Worlds === :scene: */
 
-typedef struct {
+typedef struct Tin_Scene {
 	Tin_List bodies;
 	Tin_List arbiters;
 	Tin_List joints;
