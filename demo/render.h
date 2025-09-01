@@ -18,4 +18,5 @@ void render_draw_model(const Model *model, const Tin_Transform *transform, Tin_V
 void render_start_overlay(void);
 void render_push_vertex(Tin_Vec3 v);
 void render_draw_lines(Tin_Vec3 color);
+void render_draw_triangle_strip(Tin_Vec3 color);
 

@@ -48,6 +48,8 @@ typedef float Tin_Scalar;
 struct Tin_Vec3 { Tin_Scalar c[3]; };
 typedef struct Tin_Vec3 Tin_Vec3;
 
+#define TIN_VEC3(x, y, z) ((Tin_Vec3){{x,y,z}})
+
 Tin_Vec3 tin_neg_v3  (Tin_Vec3 x);
 Tin_Vec3 tin_add_v3  (Tin_Vec3 a, Tin_Vec3 b);
 Tin_Vec3 tin_sub_v3  (Tin_Vec3 a, Tin_Vec3 b);
@@ -254,7 +256,7 @@ void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt);
 void tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt);
 void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
 Tin_Collision *tin_broadphase(Tin_Scene *scene, size_t *count_out);
-void tin_simulate(Tin_Scene *scene, Tin_Scalar dt);
+void tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6]);
 
 Tin_Body *tin_add_body(Tin_Scene *scene);
 Tin_Arbiter *tin_add_arbiter(Tin_Scene *scene);

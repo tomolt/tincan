@@ -1051,21 +1051,51 @@ tin_narrowphase(Tin_Scene *scene, Tin_Collision *collisions, size_t num_collisio
 }
 
 void
-tin_simulate(Tin_Scene *scene, Tin_Scalar dt)
+tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6])
 {
+	double startTime, stopTime;
+	if (timings) {
+		for (int t = 0; t < 6; t++) {
+			timings[t] = 0.0;
+		}
+	}
+
 	Tin_Scalar stepDt = dt / 4.0f;
 	Tin_Scalar stepInvDt = 1.0f / stepDt;
 	for (int step = 0; step < 4; step++) {
+		startTime = gettime ? gettime() : 0.0;
 		tin_scene_update(scene);
+		stopTime = gettime ? gettime() : 0.0;
+		if (timings) timings[0] += stopTime - startTime;
+		
+		startTime = gettime ? gettime() : 0.0;
 		size_t num_collisions;
 		Tin_Collision *collisions = tin_broadphase(scene, &num_collisions);
+		stopTime = gettime ? gettime() : 0.0;
+		if (timings) timings[1] += stopTime - startTime;
+
+		startTime = gettime ? gettime() : 0.0;
 		tin_narrowphase(scene, collisions, num_collisions);
 		free(collisions);
+		stopTime = gettime ? gettime() : 0.0;
+		if (timings) timings[2] += stopTime - startTime;
+		
+		startTime = gettime ? gettime() : 0.0;
 		tin_scene_prestep(scene, stepInvDt);
+		stopTime = gettime ? gettime() : 0.0;
+		if (timings) timings[3] += stopTime - startTime;
+
+		startTime = gettime ? gettime() : 0.0;
 		for (int iter = 0; iter < 4; iter++) {
 			tin_scene_step(scene, stepInvDt);
 		}
+		stopTime = gettime ? gettime() : 0.0;
+		if (timings) timings[4] += stopTime - startTime;
+		
+		startTime = gettime ? gettime() : 0.0;
 		tin_integrate(scene, stepDt);
+		stopTime = gettime ? gettime() : 0.0;
+		if (timings) timings[5] += stopTime - startTime;
 	}
 }
 

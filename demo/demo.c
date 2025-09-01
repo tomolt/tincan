@@ -152,6 +152,10 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 
 	case GLFW_KEY_SPACE:
 		if (action == GLFW_PRESS) {
+			if (num_objects >= MAX_OBJECTS) {
+				printf("Cannot spawn box: too many objects already present.\n");
+				break;
+			}
 			Tin_Vec3 forward = {{ -cam->rotation[6], -cam->rotation[7], -cam->rotation[8] }};
 			Tin_Body *body = tin_add_body(&scene);
 			*body = (Tin_Body) {
@@ -353,7 +357,8 @@ main(void)
 		render_view_matrix = mat4_from_inverse_transform(&camtrf);
 
 		double startTime = glfwGetTime();
-		tin_simulate(&scene, dt);
+		double timings[6];
+		tin_simulate(&scene, dt, glfwGetTime, timings);
 		double elapsedTime = glfwGetTime() - startTime;
 		char title[100];
 		snprintf(title, sizeof title, "tincan physics demo - %02dms", (int)(elapsedTime * 1000.0f + 0.5f));
@@ -423,11 +428,11 @@ main(void)
 			render_draw_model(obj->model, &obj->body->transform, obj->color);
 		}
 
-		render_start_overlay();
-
 		render_proj_matrix = mat4_orthographic(width, height);
 		render_view_matrix = mat4_from_transform(&ident);
+		render_start_overlay();
 
+		/* Draw Crosshair */
 		int cx = width / 2;
 		int cy = height / 2;
 		render_push_vertex((Tin_Vec3) {{ cx-6, cy }});
@@ -435,6 +440,30 @@ main(void)
 		render_push_vertex((Tin_Vec3) {{ cx, cy-5 }});
 		render_push_vertex((Tin_Vec3) {{ cx, cy+6 }});
 		render_draw_lines((Tin_Vec3) {{ 1.0f, 1.0f, 1.0f }});
+
+		/* Draw timing bar graph */
+		const Tin_Scalar barY1 = height - 20;
+		const Tin_Scalar barY2 = height;
+		const Tin_Vec3 barColors[] = {
+			{{ 1.0, 0.0, 0.0 }},
+			{{ 0.5, 0.5, 0.0 }},
+			{{ 0.0, 1.0, 0.0 }},
+			{{ 0.0, 0.5, 0.5 }},
+			{{ 0.0, 0.0, 1.0 }},
+			{{ 0.5, 0.0, 0.5 }},
+		};
+		if (elapsedTime) {
+			Tin_Scalar barX = 0.0;
+			for (int t = 0; t < 6; t++) {
+				Tin_Scalar barLength = timings[t] / elapsedTime * width;
+				render_push_vertex(TIN_VEC3(barX, barY1, 0));
+				render_push_vertex(TIN_VEC3(barX, barY2, 0));
+				render_push_vertex(TIN_VEC3(barX+barLength, barY1, 0));
+				render_push_vertex(TIN_VEC3(barX+barLength, barY2, 0));
+				render_draw_triangle_strip(barColors[t]);
+				barX += barLength;
+			}
+		}
 
 		glfwSwapBuffers(window);
 	}

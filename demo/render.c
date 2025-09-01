@@ -263,3 +263,14 @@ render_draw_lines(Tin_Vec3 color)
 	overlay_vbo_count  = 0;
 }
 
+void
+render_draw_triangle_strip(Tin_Vec3 color)
+{
+	glUniformMatrix4fv(overlay_uniforms[0], 1, GL_FALSE, render_view_matrix.c);
+	glUniformMatrix4fv(overlay_uniforms[1], 1, GL_FALSE, render_proj_matrix.c);
+	glUniform4f(overlay_uniforms[2], color.c[0], color.c[1], color.c[2], 1.0f);
+	glDrawArrays(GL_TRIANGLE_STRIP, overlay_vbo_start, overlay_vbo_count);
+	overlay_vbo_start += overlay_vbo_count;
+	overlay_vbo_count  = 0;
+}
+
