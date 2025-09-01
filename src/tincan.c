@@ -1133,6 +1133,13 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 		size_t num_collisions;
 		Tin_Collision *collisions = tin_broadphase(scene, &num_collisions);
 		tin_build_islands(scene, collisions, num_collisions);
+		size_t old_num_collisions = num_collisions;
+		num_collisions = 0;
+		for (size_t c = 0; c < old_num_collisions; c++) {
+			if (!tin_island_find(collisions[c].bodyA)->islandStable || !tin_island_find(collisions[c].bodyB)->islandStable) {
+				collisions[num_collisions++] = collisions[c];
+			}
+		}
 		stopTime = gettime ? gettime() : 0.0;
 		if (timings) timings[1] += stopTime - startTime;
 
