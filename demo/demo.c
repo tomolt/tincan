@@ -456,6 +456,23 @@ main(void)
 		}
 		render_draw_lines(TIN_VEC3(0.0, 0.0, 1.0));
 
+		render_start_overlay();
+		for (int o1 = 0; o1 < num_objects; o1++) {
+			for (int o2 = o1+1; o2 < num_objects; o2++) {
+				void *payload;
+				if (!tin_find_pair(&scene.arbiters, (uintptr_t)objects[o1].body, (uintptr_t)objects[o2].body, &payload)) {
+					continue;
+				}
+				Tin_Arbiter *arbiter = payload;
+				for (int c = 0; c < arbiter->numContacts; c++) {
+					Tin_Contact *contact = &arbiter->contacts[c];
+					render_push_vertex(contact->position);
+					render_push_vertex(tin_saxpy_v3(contact->separation, contact->normal, contact->position));
+				}
+			}
+		}
+		render_draw_lines(TIN_VEC3(1.0, 0.0, 0.0));
+
 		render_proj_matrix = mat4_orthographic(width, height);
 		render_view_matrix = mat4_from_transform(&ident);
 		render_start_overlay();
