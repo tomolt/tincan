@@ -617,10 +617,10 @@ tin_jacobian_along_axis(Tin_Scalar jacobian[12], Tin_Vec3 axis, Tin_Vec3 r1, Tin
 void
 tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
-	const Tin_Scalar maxSeparation = 0.1f;
-	const Tin_Scalar maxStretch = 0.3f;
+	const Tin_Scalar maxSeparation = 0.02f;
+	const Tin_Scalar maxStretch = 0.05f;
 	const Tin_Scalar allowedPenetration = 0.01f;
-	const Tin_Scalar biasFactor = 0.1f;
+	const Tin_Scalar biasFactor = 0.01f;
 
 	for (int i = 0; i < arbiter->numContacts; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
@@ -678,7 +678,7 @@ tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	const Tin_Body *islandB = tin_island_find(arbiter->body2);
 	if (islandA->islandStable && islandB->islandStable) return;
 
-	const Tin_Scalar friction = 0.3f;
+	const Tin_Scalar friction = 0.5f;
 
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
