@@ -536,6 +536,15 @@ tin_effective_mass(const Tin_Body *body1, const Tin_Body *body2, Tin_Scalar jaco
 }
 
 void
+tin_apply_impulse(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], Tin_Scalar magnitude)
+{
+	body1->velocity = tin_saxpy_v3(magnitude * body1->invMass, TIN_VEC3(jacobian[0], jacobian[1], jacobian[2]), body1->velocity);
+	body1->angularVelocity = tin_saxpy_v3(magnitude, tin_solve_inertia(body1, TIN_VEC3(jacobian[3], jacobian[4], jacobian[5])), body1->angularVelocity);
+	body2->velocity = tin_saxpy_v3(magnitude * body2->invMass, TIN_VEC3(jacobian[6], jacobian[7], jacobian[8]), body2->velocity);
+	body2->angularVelocity = tin_saxpy_v3(magnitude, tin_solve_inertia(body2, TIN_VEC3(jacobian[9], jacobian[10], jacobian[11])), body2->angularVelocity);
+}
+
+void
 tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12],
 	Tin_Scalar effectiveMass, Tin_Scalar bias,
 	Tin_Scalar *magnitudeAccum, Tin_Scalar minMagnitude, Tin_Scalar maxMagnitude)
@@ -557,11 +566,7 @@ tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12],
 		magnitude = *magnitudeAccum - prevAccum;
 	}
 
-	/* Apply impulse */
-	body1->velocity = tin_saxpy_v3(magnitude * body1->invMass, (Tin_Vec3){{ jacobian[0], jacobian[1], jacobian[2] }}, body1->velocity);
-	body1->angularVelocity = tin_saxpy_v3(magnitude, tin_solve_inertia(body1, (Tin_Vec3){{ jacobian[3], jacobian[4], jacobian[5] }}), body1->angularVelocity);
-	body2->velocity = tin_saxpy_v3(magnitude * body2->invMass, (Tin_Vec3){{ jacobian[6], jacobian[7], jacobian[8] }}, body2->velocity);
-	body2->angularVelocity = tin_saxpy_v3(magnitude, tin_solve_inertia(body2, (Tin_Vec3){{ jacobian[9], jacobian[10], jacobian[11] }}), body2->angularVelocity);
+	tin_apply_impulse(body1, body2, jacobian, magnitude);
 }
 
 void
@@ -592,6 +597,9 @@ tin_arbiter_add_contact(Tin_Arbiter *arbiter, Tin_Contact contact)
 			bestDist = dist;
 		}
 	}
+	contact.ineqAccum = 0.0f;
+	contact.tangentAccum = 0.0f;
+	contact.bitangentAccum = 0.0f;
 	arbiter->contacts[bestIdx] = contact;
 }
 
@@ -620,7 +628,7 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	const Tin_Scalar maxSeparation = 0.02f;
 	const Tin_Scalar maxStretch = 0.05f;
 	const Tin_Scalar allowedPenetration = 0.01f;
-	const Tin_Scalar biasFactor = 0.01f;
+	const Tin_Scalar biasFactor = 0.1f;
 
 	for (int i = 0; i < arbiter->numContacts; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
@@ -662,9 +670,19 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 
 		contact->bias = -biasFactor * invDt * MIN(0.0f, contact->separation + allowedPenetration);
 
-		contact->ineqAccum = 0.0f;
 		contact->tangentAccum = 0.0f;
 		contact->bitangentAccum = 0.0f;
+	}
+}
+
+void
+tin_arbiter_warm_start(Tin_Arbiter *arbiter)
+{
+	for (int idx = 0; idx < arbiter->numContacts; idx++) {
+		Tin_Contact *contact = &arbiter->contacts[idx];
+		if (contact->separation >= 0.0f) continue;
+
+		tin_apply_impulse(arbiter->body1, arbiter->body2, contact->jacobian, contact->ineqAccum);
 	}
 }
 
@@ -673,10 +691,6 @@ tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
 	// TODO
 	(void)invDt;
-
-	const Tin_Body *islandA = tin_island_find(arbiter->body1);
-	const Tin_Body *islandB = tin_island_find(arbiter->body2);
-	if (islandA->islandStable && islandB->islandStable) return;
 
 	const Tin_Scalar friction = 0.5f;
 
@@ -1010,6 +1024,7 @@ tin_scene_prestep(Tin_Scene *scene, Tin_Collision *collisions, size_t numCollisi
 	for (size_t c = 0; c < numCollisions; c++) {
 		Tin_Arbiter *arbiter = tin_find_arbiter(scene, collisions[c].bodyA, collisions[c].bodyB);
 		tin_arbiter_prestep(arbiter, invDt);
+		tin_arbiter_warm_start(arbiter);
 	}
 }
 
