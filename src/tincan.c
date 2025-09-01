@@ -565,36 +565,6 @@ tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12],
 }
 
 void
-tin_arbiter_update(Tin_Arbiter *arbiter)
-{
-	const Tin_Scalar maxSeparation = 0.1f;
-	const Tin_Scalar maxStretch = 0.3f;
-
-	for (int i = 0; i < arbiter->numContacts; i++) {
-		Tin_Contact *contact = &arbiter->contacts[i];
-
-		Tin_Vec3 p1 = tin_fwtrf_point(&arbiter->body1->transform, contact->rel1);
-		Tin_Vec3 p2 = tin_fwtrf_point(&arbiter->body2->transform, contact->rel2);
-
-		Tin_Scalar separation = tin_dot_v3(contact->normal, tin_sub_v3(p2, p1));
-
-		if (separation > maxSeparation) {
-			*contact = arbiter->contacts[--arbiter->numContacts];
-			i--;
-			continue;
-		}
-
-		Tin_Scalar stretch = tin_length_v3(tin_gram_schmidt(contact->normal, tin_sub_v3(p1, p2)));
-		if (stretch > maxStretch) {
-			*contact = arbiter->contacts[--arbiter->numContacts];
-			i--;
-			continue;
-		}
-	}
-
-}
-
-void
 tin_arbiter_add_contact(Tin_Arbiter *arbiter, Tin_Contact contact)
 {
 	Tin_Vec3 p1, p2;
