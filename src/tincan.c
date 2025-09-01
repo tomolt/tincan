@@ -929,7 +929,7 @@ tin_island_find(Tin_Body *body)
 	if (body->island != island) {
 		body->island = island;
 	}
-	return body;
+	return island;
 }
 
 void
@@ -951,7 +951,9 @@ tin_build_islands(Tin_Scene *scene, const Tin_Collision *collisions, size_t numC
 	}
 
 	for (size_t c = 0; c < numCollisions; c++) {
-		tin_island_union(collisions[c].bodyA, collisions[c].bodyB);
+		if (collisions[c].bodyA->invMass != 0.0 && collisions[c].bodyB->invMass != 0.0) {
+			tin_island_union(collisions[c].bodyA, collisions[c].bodyB);
+		}
 	}
 
 	{

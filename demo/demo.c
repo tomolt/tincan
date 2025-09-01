@@ -444,6 +444,18 @@ main(void)
 			render_draw_model(obj->model, &obj->body->transform, color);
 		}
 
+		render_start_overlay();
+		for (int o = 0; o < num_objects; o++) {
+			Object *obj = &objects[o];
+			Tin_Body *body = obj->body;
+			Tin_Body *island = tin_island_find(body);
+			if (body != island) {
+				render_push_vertex(body->transform.translation);
+				render_push_vertex(island->transform.translation);
+			}
+		}
+		render_draw_lines(TIN_VEC3(0.0, 0.0, 1.0));
+
 		render_proj_matrix = mat4_orthographic(width, height);
 		render_view_matrix = mat4_from_transform(&ident);
 		render_start_overlay();
