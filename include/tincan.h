@@ -190,7 +190,6 @@ int tin_polytope_collide(
 #define TIN_MAX_CONTACTS 4
 
 typedef struct {
-	Tin_List node;
 	Tin_Body *body1;
 	Tin_Body *body2;
 	int numContacts;
@@ -198,7 +197,6 @@ typedef struct {
 } Tin_Arbiter;
 
 Tin_Vec3 tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec);
-void tin_arbiter_update(Tin_Arbiter *arbiter);
 void tin_arbiter_add_contact(Tin_Arbiter *arbiter, Tin_Contact contact);
 void tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt);
 void tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt);
@@ -254,8 +252,8 @@ void tin_build_islands(Tin_Scene *scene, const Tin_Collision *collisions, size_t
 
 typedef struct Tin_Scene {
 	Tin_List bodies;
-	Tin_List arbiters;
 	Tin_List joints;
+	Tin_PairTable arbiters;
 	Tin_Allocator bodyAllocator;
 	Tin_Allocator arbiterAllocator;
 	Tin_Allocator jointAllocator;
@@ -264,8 +262,8 @@ typedef struct Tin_Scene {
 Tin_Arbiter *tin_find_arbiter(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2);
 void tin_scene_update(Tin_Scene *scene);
 void tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2);
-void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt);
-void tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt);
+void tin_scene_prestep(Tin_Scene *scene, Tin_Collision *collisions, size_t numCollisions, Tin_Scalar invDt);
+void tin_scene_step(Tin_Scene *scene, Tin_Collision *collisions, size_t numCollisions, Tin_Scalar invDt);
 void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
 Tin_Collision *tin_broadphase(Tin_Scene *scene, size_t *count_out);
 void tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6]);

@@ -257,8 +257,8 @@ main(void)
 	camera.position.c[2] = 5.0f;
 
 	TIN_LIST_INIT(scene.bodies);
-	TIN_LIST_INIT(scene.arbiters);
 	TIN_LIST_INIT(scene.joints);
+	tin_create_pairtable(&scene.arbiters);
 	scene.bodyAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Body), custom_alloc, custom_free };
 	scene.arbiterAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Arbiter), custom_alloc, custom_free };
 	scene.jointAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Joint), custom_alloc, custom_free };

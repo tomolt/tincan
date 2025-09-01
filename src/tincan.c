@@ -647,8 +647,32 @@ tin_jacobian_along_axis(Tin_Scalar jacobian[12], Tin_Vec3 axis, Tin_Vec3 r1, Tin
 void
 tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
+	const Tin_Scalar maxSeparation = 0.1f;
+	const Tin_Scalar maxStretch = 0.3f;
 	const Tin_Scalar allowedPenetration = 0.01f;
 	const Tin_Scalar biasFactor = 0.1f;
+
+	for (int i = 0; i < arbiter->numContacts; i++) {
+		Tin_Contact *contact = &arbiter->contacts[i];
+
+		Tin_Vec3 p1 = tin_fwtrf_point(&arbiter->body1->transform, contact->rel1);
+		Tin_Vec3 p2 = tin_fwtrf_point(&arbiter->body2->transform, contact->rel2);
+
+		Tin_Scalar separation = tin_dot_v3(contact->normal, tin_sub_v3(p2, p1));
+
+		if (separation > maxSeparation) {
+			*contact = arbiter->contacts[--arbiter->numContacts];
+			i--;
+			continue;
+		}
+
+		Tin_Scalar stretch = tin_length_v3(tin_gram_schmidt(contact->normal, tin_sub_v3(p1, p2)));
+		if (stretch > maxStretch) {
+			*contact = arbiter->contacts[--arbiter->numContacts];
+			i--;
+			continue;
+		}
+	}
 
 	for (int i = 0; i < arbiter->numContacts; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
@@ -960,42 +984,35 @@ tin_build_islands(Tin_Scene *scene, const Tin_Collision *collisions, size_t numC
 Tin_Arbiter *
 tin_find_arbiter(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2)
 {
-	TIN_FOR_EACH(arbiter, scene->arbiters, Tin_Arbiter, node) {
-		if (arbiter->body1 == body1 && arbiter->body2 == body2) {
-			return arbiter;
-		}
+	void *payload;
+	if (tin_find_pair(&scene->arbiters, (uintptr_t)body1, (uintptr_t)body2, &payload)) {
+		return payload;
 	}
-	arbiter = tin_add_arbiter(scene);
+	Tin_Arbiter *arbiter = tin_add_arbiter(scene);
 	arbiter->body1 = body1;
 	arbiter->body2 = body2;
+	tin_insert_pair(&scene->arbiters, (uintptr_t)body1, (uintptr_t)body2, arbiter);
 	return arbiter;
 }
 
 void
 tin_scene_update(Tin_Scene *scene)
 {
-	{
-		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
-			Tin_Scalar *rotation = body->transform.rotation;
+	TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+		Tin_Scalar *rotation = body->transform.rotation;
 
-			/* Compute product = rotation * inertia_local^-1 */
-			Tin_Scalar factor = body->invMass / (body->transform.scale * body->transform.scale);
-			Tin_Scalar product[3*3];
-			for (int j = 0; j < 3; j++) {
-				Tin_Scalar diagonalEntry = factor * body->shape->invInertia.c[j];
-				product[3*j+0] = rotation[3*j+0] * diagonalEntry;
-				product[3*j+1] = rotation[3*j+1] * diagonalEntry;
-				product[3*j+2] = rotation[3*j+2] * diagonalEntry;
-			}
+		/* Compute product = rotation * inertia_local^-1 */
+		Tin_Scalar factor = body->invMass / (body->transform.scale * body->transform.scale);
+		Tin_Scalar product[3*3];
+		for (int j = 0; j < 3; j++) {
+			Tin_Scalar diagonalEntry = factor * body->shape->invInertia.c[j];
+			product[3*j+0] = rotation[3*j+0] * diagonalEntry;
+			product[3*j+1] = rotation[3*j+1] * diagonalEntry;
+			product[3*j+2] = rotation[3*j+2] * diagonalEntry;
+		}
 
-			/* Compute inertia_global^-1 = rotation * inertia_local^-1 * rotation^T */
-			tin_m3_times_m3_transposed(body->invInertia, product, rotation);
-		}
-	}
-	{
-		TIN_FOR_EACH(arbiter, scene->arbiters, Tin_Arbiter, node) {
-			tin_arbiter_update(arbiter);
-		}
+		/* Compute inertia_global^-1 = rotation * inertia_local^-1 * rotation^T */
+		tin_m3_times_m3_transposed(body->invInertia, product, rotation);
 	}
 }
 
@@ -1018,26 +1035,23 @@ tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2)
 }
 
 void
-tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt)
+tin_scene_prestep(Tin_Scene *scene, Tin_Collision *collisions, size_t numCollisions, Tin_Scalar invDt)
 {
-	TIN_FOR_EACH(arbiter, scene->arbiters, Tin_Arbiter, node) {
+	for (size_t c = 0; c < numCollisions; c++) {
+		Tin_Arbiter *arbiter = tin_find_arbiter(scene, collisions[c].bodyA, collisions[c].bodyB);
 		tin_arbiter_prestep(arbiter, invDt);
 	}
-
 }
 
 void
-tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt)
+tin_scene_step(Tin_Scene *scene, Tin_Collision *collisions, size_t numCollisions, Tin_Scalar invDt)
 {
-	{
-		TIN_FOR_EACH(arbiter, scene->arbiters, Tin_Arbiter, node) {
-			tin_arbiter_apply_impulse(arbiter, invDt);
-		}
+	for (size_t c = 0; c < numCollisions; c++) {
+		Tin_Arbiter *arbiter = tin_find_arbiter(scene, collisions[c].bodyA, collisions[c].bodyB);
+		tin_arbiter_apply_impulse(arbiter, invDt);
 	}
-	{
-		TIN_FOR_EACH(joint, scene->joints, Tin_Joint, node) {
-			tin_joint_apply_impulse(joint, invDt);
-		}
+	TIN_FOR_EACH(joint, scene->joints, Tin_Joint, node) {
+		tin_joint_apply_impulse(joint, invDt);
 	}
 }
 
@@ -1145,23 +1159,23 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 
 		startTime = gettime ? gettime() : 0.0;
 		tin_narrowphase(scene, collisions, num_collisions);
-		free(collisions);
 		stopTime = gettime ? gettime() : 0.0;
 		if (timings) timings[2] += stopTime - startTime;
 		
 		startTime = gettime ? gettime() : 0.0;
-		tin_scene_prestep(scene, stepInvDt);
+		tin_scene_prestep(scene, collisions, num_collisions, stepInvDt);
 		stopTime = gettime ? gettime() : 0.0;
 		if (timings) timings[3] += stopTime - startTime;
 
 		startTime = gettime ? gettime() : 0.0;
 		for (int iter = 0; iter < 4; iter++) {
-			tin_scene_step(scene, stepInvDt);
+			tin_scene_step(scene, collisions, num_collisions, stepInvDt);
 		}
 		stopTime = gettime ? gettime() : 0.0;
 		if (timings) timings[4] += stopTime - startTime;
 		
 		startTime = gettime ? gettime() : 0.0;
+		free(collisions);
 		tin_integrate(scene, stepDt);
 		stopTime = gettime ? gettime() : 0.0;
 		if (timings) timings[5] += stopTime - startTime;
@@ -1183,8 +1197,6 @@ tin_add_arbiter(Tin_Scene *scene)
 {
 	Tin_Arbiter *arbiter = scene->arbiterAllocator.alloc(scene->arbiterAllocator.userPointer);
 	memset(arbiter, 0, sizeof *arbiter);
-	TIN_LIST_LINK(*scene->arbiters.prev, arbiter->node);
-	TIN_LIST_LINK(arbiter->node, scene->arbiters);
 	return arbiter;
 }
 
