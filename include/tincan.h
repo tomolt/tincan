@@ -182,10 +182,14 @@ typedef struct {
 	Tin_Scalar effectiveMass[3];
 } Tin_Contact;
 
+void tin_update_pspoint(const Tin_Polysum *s, Tin_Pspoint *pt);
+void tin_update_portal(const Tin_Polysum *s, Tin_Portal *p);
+
 int tin_polytope_collide(
 	const Tin_Polytope *pa, const Tin_Transform *ta,
 	const Tin_Polytope *pb, const Tin_Transform *tb,
-	Tin_Contact *contact);
+	Tin_Portal *cachedPortal,
+	Tin_Ray *rayOut, Tin_Portal *portalOut, bool *hasPortalOut);
 
 #define TIN_MAX_CONTACTS 4
 
@@ -193,7 +197,9 @@ typedef struct {
 	Tin_List node;
 	Tin_Body *body1;
 	Tin_Body *body2;
+	Tin_Portal cachedPortal;
 	int numContacts;
+	bool hasCachedPortal;
 	Tin_Contact contacts[TIN_MAX_CONTACTS];
 } Tin_Arbiter;
 

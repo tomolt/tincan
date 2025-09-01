@@ -446,11 +446,32 @@ tin_calculate_contact(const Tin_Ray *r, const Tin_Portal *p, Tin_Contact *contac
 	contact->rel2 = tin_saxpy_v3(gamma, p->c.relTo2, contact->rel2);
 }
 
+void
+tin_update_pspoint(const Tin_Polysum *s, Tin_Pspoint *pt)
+{
+	Tin_Vec3 abs1 = tin_fwtrf_point(s->transform1, pt->relTo1);
+	Tin_Vec3 abs2 = tin_fwtrf_point(s->transform2, pt->relTo2);
+	pt->abs = tin_sub_v3(abs1, abs2);
+}
+
+void
+tin_update_portal(const Tin_Polysum *s, Tin_Portal *p)
+{
+	tin_update_pspoint(s, &p->a);
+	tin_update_pspoint(s, &p->b);
+	tin_update_pspoint(s, &p->c);
+	Tin_Vec3 ab = tin_sub_v3(p->b.abs, p->a.abs);
+	Tin_Vec3 ac = tin_sub_v3(p->c.abs, p->a.abs);
+	p->normal = tin_cross_v3(ab, ac);
+	p->normal = tin_normalize_v3(p->normal);
+}
+
 int
 tin_polytope_collide(
 	const Tin_Polytope *pa, const Tin_Transform *ta,
 	const Tin_Polytope *pb, const Tin_Transform *tb,
-	Tin_Contact *contact)
+	Tin_Portal *cachedPortal,
+	Tin_Ray *rayOut, Tin_Portal *portalOut, bool *hasPortalOut)
 {
 	Tin_Polysum ps = { pa, ta, pb, tb };
 
@@ -459,18 +480,52 @@ tin_polytope_collide(
 	r.dir    = tin_neg_v3(r.origin);
 	Tin_Scalar norm = sqrt(tin_dot_v3(r.dir, r.dir));
 	if (norm == 0.0f) {
-		/* FIXME */
-		return 1;
+		r.dir = TIN_VEC3(1.0, 0.0, 0.0);
 	}
 	r.dir = tin_normalize_v3(r.dir);
 
 	Tin_Portal p;
-	if (!tin_construct_portal(&ps, &r, &p)) {
-		return 0;
+
+	bool canReusePortal = false;
+	if (cachedPortal) {
+		p = *cachedPortal;
+		tin_update_portal(&ps, &p);
+
+		Tin_Vec3 oa = tin_sub_v3(p.a.abs, r.origin);
+		Tin_Vec3 ob = tin_sub_v3(p.b.abs, r.origin);
+		Tin_Vec3 oc = tin_sub_v3(p.c.abs, r.origin);
+
+		canReusePortal = true;
+		
+		Tin_Vec3 an = tin_cross_v3(ob, oc);
+		if (tin_dot_v3(an, oa) * tin_dot_v3(an, r.dir) < 0.0f) {
+			canReusePortal = false;
+		}
+		
+		Tin_Vec3 bn = tin_cross_v3(oc, oa);
+		if (tin_dot_v3(bn, ob) * tin_dot_v3(bn, r.dir) < 0.0f) {
+			canReusePortal = false;
+		}
+		
+		Tin_Vec3 cn = tin_cross_v3(oa, ob);
+		if (tin_dot_v3(cn, oc) * tin_dot_v3(cn, r.dir) < 0.0f) {
+			canReusePortal = false;
+		}
+	}
+
+	if (!canReusePortal) {
+		if (!tin_construct_portal(&ps, &r, &p)) {
+			*rayOut = r;
+			*hasPortalOut = false;
+			return 0;
+		}
 	}
 	tin_refine_portal(&ps, &r, &p);
 	p.normal = tin_normalize_v3(p.normal);
 	if (tin_dot_v3(p.normal, p.a.abs) <= 0.0f) {
+		*rayOut = r;
+		*portalOut = p;
+		*hasPortalOut = true;
 		return 0;
 	}
 
@@ -491,7 +546,9 @@ tin_polytope_collide(
 		if (proj >= 0.99f) break;
 	}
 
-	tin_calculate_contact(&r, &p, contact);
+	*rayOut = r;
+	*portalOut = p;
+	*hasPortalOut = true;
 	return 1;
 }
 
@@ -592,6 +649,7 @@ tin_arbiter_update(Tin_Arbiter *arbiter)
 		}
 	}
 
+	// TODO remove useless arbiters
 }
 
 void
@@ -1005,14 +1063,20 @@ tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2)
 	Tin_Arbiter *arbiter = tin_find_arbiter(scene, body1, body2);
 	if (!arbiter) return;
 
-	Tin_Contact contact;
+	Tin_Ray ray;
+	Tin_Portal portal;
+	bool hasPortal;
 	int colliding = tin_polytope_collide(
 			&body1->shape->polytope, &body1->transform,
-			&body2->shape->polytope, &body2->transform, &contact);
+			&body2->shape->polytope, &body2->transform,
+			arbiter->hasCachedPortal ? &arbiter->cachedPortal : NULL,
+			&ray, &portal, &hasPortal);
+	arbiter->cachedPortal = portal;
+	arbiter->hasCachedPortal = hasPortal;
 
 	if (colliding) {
-		/*printf("D %f\n", tin_dot_v3(contact.normal,
-					tin_sub_v3(body2->transform.translation, body1->transform.translation)));*/
+		Tin_Contact contact;
+		tin_calculate_contact(&ray, &portal, &contact);
 		tin_arbiter_add_contact(arbiter, contact);
 	}
 }
