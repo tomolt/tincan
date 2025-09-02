@@ -121,7 +121,7 @@ struct Tin_Body {
 	Tin_Vec3      aabbMin;
 	Tin_Vec3      aabbMax;
 	Tin_Body     *island;
-	bool          stable;
+	int           restCounter;
 	bool          islandStable;
 };
 

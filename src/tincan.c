@@ -961,7 +961,7 @@ tin_build_islands(Tin_Scene *scene, const Tin_Collision *collisions, size_t numC
 
 	{
 		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
-			if (body->stable) continue;
+			if (body->restCounter >= 5 || body->invMass == 0.0) continue;
 			Tin_Body *island = tin_island_find(body);
 			island->islandStable = false;
 		}
@@ -1070,13 +1070,16 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 			stable = false;
 		}
 
-		if (body->invMass == 0.0f) {
-			body->stable = true;
-		} else {
-			body->stable = stable;
-			if (!body->stable) {
-				body->velocity = tin_saxpy_v3(dt, (Tin_Vec3) {{ 0.0f, -2.0f, 0.0f }}, body->velocity);
+		if (!tin_island_find(body)->islandStable) {
+			body->velocity = tin_saxpy_v3(dt, (Tin_Vec3) {{ 0.0f, -2.0f, 0.0f }}, body->velocity);
+		}
+
+		if (stable) {
+			if (body->restCounter < 5) {
+				body->restCounter++;
 			}
+		} else {
+			body->restCounter = 0;
 		}
 	}
 }
