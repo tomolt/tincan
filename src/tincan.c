@@ -492,6 +492,7 @@ tin_polytope_collide(
 	}
 
 	tin_calculate_contact(&r, &p, contact);
+	contact->rel1Normal = tin_bwtrf_dir(ta, contact->normal);
 	return 1;
 }
 
@@ -658,7 +659,9 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		Tin_Vec3 p1 = tin_fwtrf_point(&arbiter->body1->transform, contact->rel1);
 		Tin_Vec3 p2 = tin_fwtrf_point(&arbiter->body2->transform, contact->rel2);
 
-		contact->position   = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
+		//contact->position   = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
+		contact->position = p1;
+		contact->normal = tin_fwtrf_dir(&arbiter->body1->transform, contact->rel1Normal);
 		contact->separation = tin_dot_v3(contact->normal, tin_sub_v3(p2, p1));
 
 		Tin_Vec3 r1 = tin_sub_v3(contact->position, arbiter->body1->transform.translation);

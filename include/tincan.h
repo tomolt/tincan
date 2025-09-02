@@ -169,6 +169,7 @@ typedef struct {
 	Tin_Vec3   rel1;
 	Tin_Vec3   rel2;
 	Tin_Vec3   normal;
+	Tin_Vec3   rel1Normal;
 	Tin_Scalar baseStretch;
 
 	Tin_Vec3   position;
