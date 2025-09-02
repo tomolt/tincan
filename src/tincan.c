@@ -1170,10 +1170,17 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 }
 
 Tin_Body *
-tin_add_body(Tin_Scene *scene)
+tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 {
 	Tin_Body *body = scene->bodyAllocator.alloc(scene->bodyAllocator.userPointer);
 	memset(body, 0, sizeof *body);
+	body->transform = (Tin_Transform) {
+		{ 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+		TIN_VEC3(0, 0, 0),
+		1.0,
+	};
+	body->shape = shape;
+	body->invMass = invMass;
 	TIN_LIST_LINK(*scene->bodies.prev, body->node);
 	TIN_LIST_LINK(body->node, scene->bodies);
 	return body;

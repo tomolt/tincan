@@ -268,7 +268,7 @@ void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
 Tin_Collision *tin_broadphase(Tin_Scene *scene, size_t *count_out);
 void tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6]);
 
-Tin_Body *tin_add_body(Tin_Scene *scene);
+Tin_Body *tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass);
 Tin_Arbiter *tin_add_arbiter(Tin_Scene *scene);
 Tin_Joint *tin_add_joint(Tin_Scene *scene);
 

@@ -5,3 +5,5 @@ demo.elf
 Makefile
 tags
 perf.data*
+*.core
+*.gcda

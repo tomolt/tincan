@@ -157,26 +157,11 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 				break;
 			}
 			Tin_Vec3 forward = {{ -cam->rotation[6], -cam->rotation[7], -cam->rotation[8] }};
-			Tin_Body *body = tin_add_body(&scene);
-			*body = (Tin_Body) {
-				body->node,
-				{
-					{ 0 },
-					tin_saxpy_v3(1.0f, forward, cam->position),
-					0.2f,
-				},
-				&cube_shape,
-				1.0f / 1.0f,
-				tin_scale_v3(5.0f, forward),
-				{{ 0.0f, 0.0f, 0.0f }},
-				{ 0 },
-				{{ 0.0f, 0.0f, 0.0f }},
-				{{ 0.0f, 0.0f, 0.0f }},
-				NULL,
-				false,
-				false,
-			};
+			Tin_Body *body = tin_add_body(&scene, &cube_shape, 1.0 / 1.0);
 			memcpy(body->transform.rotation, cam->rotation, sizeof cam->rotation);
+			body->transform.translation = tin_saxpy_v3(1.0, forward, cam->position);
+			body->transform.scale = 0.2;
+			body->velocity = tin_scale_v3(5.0, forward);
 			objects[num_objects++] = (Object) {
 				body,
 				&cube_model,
@@ -263,77 +248,26 @@ main(void)
 	scene.arbiterAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Arbiter), custom_alloc, custom_free };
 	scene.jointAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Joint), custom_alloc, custom_free };
 
-	Tin_Body *body1 = tin_add_body(&scene);
-	*body1 = (Tin_Body){
-		body1->node,
-		{
-			{ 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-			(Tin_Vec3){{ 0.0f, 1.5f, 0.0f }},
-			1.0f
-		},
-		&cone_shape,
-		1.0f / 1.0f,
-		//{{ 0.0f, 0.0f, -0.5f }},
-		{{ 0.0f, 0.0f, 0.0f }},
-		{{ 0.0f, 0.0f, 0.0f }},
-		{ 0 },
-		{{ 0.0f, 0.0f, 0.0f }},
-		{{ 0.0f, 0.0f, 0.0f }},
-		NULL,
-		false,
-		false,
-	};
+	Tin_Body *body1 = tin_add_body(&scene, &cone_shape, 1.0 / 1.0);
+	body1->transform.translation = TIN_VEC3(0.0, 1.5, 0.0);
 	objects[num_objects++] = (Object){
 		body1,
 		&cone_model,
 		{{ 0.5f, 1.0f, 0.5f }}
 	};
 
-	Tin_Body *body2 = tin_add_body(&scene);
-	*body2 = (Tin_Body){
-		body2->node,
-		{
-			{ 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-			(Tin_Vec3){{ 0.0f, -1.0f, 0.0f }},
-			1.0f
-		},
-		&cube_shape,
-		1.0f / 3.0f,
-		{{ -3.0f, 1.0f, 0.0f }},
-		{{ 0.0f, 0.0f, 0.0f }},
-		//{{ 0.1f, 0.1f, 0.0f }},
-		{ 0 },
-		{{ 0.0f, 0.0f, 0.0f }},
-		{{ 0.0f, 0.0f, 0.0f }},
-		NULL,
-		false,
-		false,
-	};
+	Tin_Body *body2 = tin_add_body(&scene, &cube_shape, 1.0 / 3.0);
+	body2->transform.translation = TIN_VEC3(0.0, -1.0, 0.0);
+	body2->velocity = TIN_VEC3(-3, 1, 0);
 	objects[num_objects++] = (Object){
 		body2,
 		&cube_model,
 		{{ 1.0f, 0.5f, 0.5f }}
 	};
 
-	Tin_Body *body3 = tin_add_body(&scene);
-	*body3 = (Tin_Body){
-		body3->node,
-		{
-			{ 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-			(Tin_Vec3) {{ 0.0f, -23.0f, 0.0f }},
-			20.0f
-		},
-		&cube_shape,
-		0.0f,
-		{{ 0.0f, 0.0f, 0.0f }},
-		{{ 0.0f, 0.0f, 0.0f }},
-		{ 0 },
-		{{ 0.0f, 0.0f, 0.0f }},
-		{{ 0.0f, 0.0f, 0.0f }},
-		NULL,
-		false,
-		false,
-	};
+	Tin_Body *body3 = tin_add_body(&scene, &cube_shape, 0.0);
+	body3->transform.translation = TIN_VEC3(0.0, -23.0, 0.0);
+	body3->transform.scale = 20.0;
 	objects[num_objects++] = (Object){
 		body3,
 		&cube_model,
