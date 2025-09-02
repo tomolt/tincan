@@ -280,6 +280,8 @@ main(void)
 	joint->relTo1 = (Tin_Vec3){{ 0.0f, -1.505f, 0.0f }};
 	joint->relTo2 = (Tin_Vec3){{ 0.0f, 1.005f, 0.0f }};
 
+	double accumTimings[6];
+
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 		Tin_Scalar dt = 1.0f / 60.0f * time_multiplier;
@@ -306,6 +308,11 @@ main(void)
 		double timings[6];
 		tin_simulate(&scene, dt, glfwGetTime, timings);
 		double elapsedTime = glfwGetTime() - startTime;
+		for (int t = 0; t < 6; t++) {
+			accumTimings[t] *= 0.8;
+			accumTimings[t] += 0.2 * timings[t];
+		}
+
 		char title[100];
 		snprintf(title, sizeof title, "tincan physics demo - %02dms", (int)(elapsedTime * 1000.0f + 0.5f));
 		glfwSetWindowTitle(window, title);
@@ -431,10 +438,14 @@ main(void)
 			{{ 0.0, 0.0, 1.0 }},
 			{{ 0.5, 0.0, 0.5 }},
 		};
-		if (elapsedTime) {
+		double timingTotal = 0.0;
+		for (int t = 0; t < 6; t++) {
+			timingTotal += accumTimings[t];
+		}
+		if (timingTotal) {
 			Tin_Scalar barX = 0.0;
 			for (int t = 0; t < 6; t++) {
-				Tin_Scalar barLength = timings[t] / elapsedTime * width;
+				Tin_Scalar barLength = accumTimings[t] / timingTotal * width;
 				render_push_vertex(TIN_VEC3(barX, barY1, 0));
 				render_push_vertex(TIN_VEC3(barX, barY2, 0));
 				render_push_vertex(TIN_VEC3(barX+barLength, barY1, 0));
