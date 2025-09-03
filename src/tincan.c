@@ -774,8 +774,10 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		contact->normal = tin_fwtrf_dir(&arbiter->body1->transform, contact->rel1Normal);
 		contact->separation = tin_dot_v3(contact->normal, tin_sub_v3(p2, p1));
 
-		Tin_Vec3 r1 = tin_sub_v3(contact->position, arbiter->body1->transform.translation);
-		Tin_Vec3 r2 = tin_sub_v3(contact->position, arbiter->body2->transform.translation);
+		Tin_Vec3 r1 = tin_fwtrf_dir(&arbiter->body1->transform,
+			tin_scale_v3(arbiter->body1->transform.scale, contact->rel1));
+		Tin_Vec3 r2 = tin_fwtrf_dir(&arbiter->body2->transform,
+			tin_scale_v3(arbiter->body2->transform.scale, contact->rel2));
 
 		/* Precompute jacobian, effectiveMass, and bias */
 		tin_jacobian_along_axis(contact->jacobian, contact->normal, r1, r2);
