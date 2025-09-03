@@ -188,7 +188,7 @@ int tin_polytope_collide(
 	const Tin_Polytope *pb, const Tin_Transform *tb,
 	Tin_Contact *contact);
 
-#define TIN_MAX_CONTACTS 4
+#define TIN_MAX_CONTACTS 5
 
 typedef struct {
 	Tin_Body *body1;

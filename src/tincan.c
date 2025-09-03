@@ -578,14 +578,9 @@ tin_arbiter_add_contact(Tin_Arbiter *arbiter, Tin_Contact contact)
 	p2 = tin_fwtrf_point(&arbiter->body2->transform, contact.rel2);
 	contact.baseStretch = tin_length_v3(tin_gram_schmidt(contact.normal, tin_sub_v3(p1, p2)));
 
-	if (arbiter->numContacts < TIN_MAX_CONTACTS) {
-		arbiter->contacts[arbiter->numContacts++] = contact;
-		return;
-	}
-
 	Tin_Vec3 newPos = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
-	int bestIdx = -1;
-	Tin_Scalar bestDist = INFINITY;
+	int minIdx = TIN_MAX_CONTACTS;
+	Tin_Scalar minDist = INFINITY;
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
 		Tin_Contact *c = &arbiter->contacts[idx];
 		p1 = tin_fwtrf_point(&arbiter->body1->transform, c->rel1);
@@ -593,15 +588,27 @@ tin_arbiter_add_contact(Tin_Arbiter *arbiter, Tin_Contact contact)
 		Tin_Vec3 oldPos = tin_scale_v3(0.5f, tin_add_v3(p1, p2));
 		Tin_Vec3 diff = tin_sub_v3(oldPos, newPos);
 		Tin_Scalar dist = tin_dot_v3(diff, diff);
-		if (dist < bestDist) {
-			bestIdx  = idx;
-			bestDist = dist;
+		if (dist < minDist) {
+			minIdx  = idx;
+			minDist = dist;
 		}
 	}
+
+	/*if (minDist < 0.001) {
+		return;
+	}*/
+
+	int newIdx;
+	if (arbiter->numContacts < TIN_MAX_CONTACTS) {
+		newIdx = arbiter->numContacts++;
+	} else {
+		newIdx = minIdx;
+	}
+
 	contact.ineqAccum = 0.0f;
 	contact.tangentAccum = 0.0f;
 	contact.bitangentAccum = 0.0f;
-	arbiter->contacts[bestIdx] = contact;
+	arbiter->contacts[newIdx] = contact;
 }
 
 void
@@ -624,12 +631,10 @@ tin_jacobian_along_axis(Tin_Scalar jacobian[12], Tin_Vec3 axis, Tin_Vec3 r1, Tin
 }
 
 void
-tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
+tin_arbiter_update(Tin_Arbiter *arbiter)
 {
-	const Tin_Scalar maxSeparation = 0.2f;
-	const Tin_Scalar maxStretch = 0.1f;
-	const Tin_Scalar allowedPenetration = 0.01f;
-	const Tin_Scalar biasFactor = 0.1f;
+	const Tin_Scalar maxSeparation = 0.1f;
+	const Tin_Scalar maxStretch = 0.2f;
 
 	for (int i = 0; i < arbiter->numContacts; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
@@ -653,6 +658,14 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		}
 	}
 
+}
+
+void
+tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
+{
+	const Tin_Scalar allowedPenetration = 0.005;
+	const Tin_Scalar biasFactor = 0.1;
+
 	for (int i = 0; i < arbiter->numContacts; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
 
@@ -671,8 +684,9 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		tin_jacobian_along_axis(contact->jacobian, contact->normal, r1, r2);
 		contact->effectiveMass[0] = tin_effective_mass(arbiter->body1, arbiter->body2, contact->jacobian);
 
-		contact->bias = -biasFactor * invDt * MIN(0.0f, contact->separation + allowedPenetration);
+		contact->bias = -biasFactor * invDt * MIN(0.0f, contact->separation + allowedPenetration) / arbiter->numContacts;
 
+		contact->ineqAccum = 0.0f;
 		contact->tangentAccum = 0.0f;
 		contact->bitangentAccum = 0.0f;
 	}
@@ -690,7 +704,21 @@ tin_arbiter_warm_start(Tin_Arbiter *arbiter)
 }
 
 void
-tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
+tin_arbiter_apply_separation(Tin_Arbiter *arbiter, Tin_Scalar invDt)
+{
+	// TODO
+	(void)invDt;
+
+	for (int idx = 0; idx < arbiter->numContacts; idx++) {
+		Tin_Contact *contact = &arbiter->contacts[idx];
+		if (contact->separation >= 0.0f) continue;
+
+		tin_enforce_jacobian(arbiter->body1, arbiter->body2, contact->jacobian, contact->effectiveMass[0], contact->bias, &contact->ineqAccum, 0.0f, INFINITY);
+	}
+}
+
+void
+tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
 	// TODO
 	(void)invDt;
@@ -700,8 +728,6 @@ tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
 		if (contact->separation >= 0.0f) continue;
-
-		tin_enforce_jacobian(arbiter->body1, arbiter->body2, contact->jacobian, contact->effectiveMass[0], contact->bias, &contact->ineqAccum, 0.0f, INFINITY);
 
 		Tin_Vec3 r1 = tin_fwtrf_dir(&arbiter->body1->transform,
 			tin_scale_v3(arbiter->body1->transform.scale, contact->rel1));
@@ -1003,6 +1029,11 @@ tin_scene_update(Tin_Scene *scene)
 		/* Compute inertia_global^-1 = rotation * inertia_local^-1 * rotation^T */
 		tin_m3_times_m3_transposed(body->invInertia, product, rotation);
 	}
+
+	for (size_t s = 0; s < scene->arbiters.capac; s++) {
+		if (!scene->arbiters.slots[s].occupied) continue;
+		tin_arbiter_update(scene->arbiters.slots[s].payload);
+	}
 }
 
 void
@@ -1038,7 +1069,11 @@ tin_scene_step(Tin_Scene *scene, Tin_Collision *collisions, size_t numCollisions
 {
 	for (size_t c = 0; c < numCollisions; c++) {
 		Tin_Arbiter *arbiter = tin_find_arbiter(scene, collisions[c].bodyA, collisions[c].bodyB);
-		tin_arbiter_apply_impulse(arbiter, invDt);
+		tin_arbiter_apply_separation(arbiter, invDt);
+	}
+	for (size_t c = 0; c < numCollisions; c++) {
+		Tin_Arbiter *arbiter = tin_find_arbiter(scene, collisions[c].bodyA, collisions[c].bodyB);
+		tin_arbiter_apply_friction(arbiter, invDt);
 	}
 	TIN_FOR_EACH(joint, scene->joints, Tin_Joint, node) {
 		tin_joint_apply_impulse(joint, invDt);
@@ -1160,7 +1195,7 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	if (timings) timings[3] += stopTime - startTime;
 
 	startTime = gettime ? gettime() : 0.0;
-	for (int iter = 0; iter < 8; iter++) {
+	for (int iter = 0; iter < 16; iter++) {
 		tin_scene_step(scene, collisions, num_collisions, invDt);
 	}
 	stopTime = gettime ? gettime() : 0.0;
