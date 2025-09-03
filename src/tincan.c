@@ -820,7 +820,7 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	// TODO
 	(void)invDt;
 
-	const Tin_Scalar friction = 0.5f;
+	const Tin_Scalar friction = 0.8f;
 
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
@@ -831,25 +831,16 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		Tin_Vec3 r2 = tin_fwtrf_dir(&arbiter->body2->transform,
 			tin_scale_v3(arbiter->body2->transform.scale, contact->rel2));
 
-		Tin_Vec3 tangent1 = tin_gram_schmidt(contact->normal, (Tin_Vec3){{ 1.0f, 0.0f, 0.0f }});
-		if (tin_dot_v3(tangent1, tangent1) == 0.0f) {
-			tangent1 = tin_gram_schmidt(contact->normal, (Tin_Vec3){{ 0.0f, 0.0f, 1.0f }});
-			if (tin_dot_v3(tangent1, tangent1) == 0.0f) {
-				tangent1 = (Tin_Vec3){{ 0.0f, 1.0f, 0.0f }};
-			}
-		}
-		Tin_Vec3 tangent2 = tin_cross_v3(contact->normal, tangent1);
+		Tin_Vec3 relVel1 = tin_add_v3(arbiter->body1->velocity, tin_cross_v3(arbiter->body1->angularVelocity, r1));
+		Tin_Vec3 relVel2 = tin_add_v3(arbiter->body2->velocity, tin_cross_v3(arbiter->body2->angularVelocity, r2));
+		Tin_Vec3 relVel = tin_sub_v3(relVel1, relVel2);
+		Tin_Vec3 frictionDir = tin_normalize_v3(relVel);
 
 		Tin_Scalar jacobian[12];
+		tin_jacobian_along_axis(jacobian, frictionDir, r1, r2);
 		Tin_Scalar effectiveMass;
-
-		tin_jacobian_along_axis(jacobian, tangent1, r1, r2);
 		effectiveMass = tin_effective_mass(arbiter->body1, arbiter->body2, jacobian);
 		tin_enforce_jacobian(arbiter->body1, arbiter->body2, jacobian, effectiveMass, 0.0f, &contact->tangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
-
-		tin_jacobian_along_axis(jacobian, tangent2, r1, r2);
-		effectiveMass = tin_effective_mass(arbiter->body1, arbiter->body2, jacobian);
-		tin_enforce_jacobian(arbiter->body1, arbiter->body2, jacobian, effectiveMass, 0.0f, &contact->bitangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 	}
 }
 
