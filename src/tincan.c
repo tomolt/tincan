@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <tgmath.h>
+#include <assert.h>
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -481,8 +482,9 @@ tin_incident_face(const Tin_Polytope *polytope, Tin_Vec3 dir)
 int
 tin_reduce_manifold(Tin_Vec3 *points, int count)
 {
+	assert(count > 0);
 	int idx = -1;
-	Tin_Scalar bestScore = -INFINITY;
+	Tin_Scalar bestScore = INFINITY;
 	for (int i = 0; i < count; i++) {
 		int j1 = i - 1;
 		if (j1 < 0) j1 = count - 1;
@@ -496,6 +498,8 @@ tin_reduce_manifold(Tin_Vec3 *points, int count)
 			bestScore = score;
 		}
 	}
+	assert(idx >= 0);
+	assert(idx < count);
 	count -= 1;
 	if (count - idx > 0) {
 		memmove(points + idx, points + idx + 1, (count - idx) * sizeof *points);

@@ -10,7 +10,7 @@
 
 #define MODEL_VBO_CAPACITY   4096
 #define MODEL_IBO_CAPACITY   4096
-#define OVERLAY_VBO_CAPACITY 4096
+#define OVERLAY_VBO_CAPACITY (16 * 1024)
 
 static GLuint  model_prog;
 static GLuint  model_uniforms[5];
