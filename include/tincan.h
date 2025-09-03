@@ -48,7 +48,7 @@ typedef float Tin_Scalar;
 struct Tin_Vec3 { Tin_Scalar c[3]; };
 typedef struct Tin_Vec3 Tin_Vec3;
 
-#define TIN_VEC3(x, y, z) ((Tin_Vec3){{x,y,z}})
+#define TIN_VEC3(x, y, z) (Tin_Vec3){{x,y,z}}
 
 Tin_Vec3 tin_neg_v3  (Tin_Vec3 x);
 Tin_Vec3 tin_add_v3  (Tin_Vec3 a, Tin_Vec3 b);
@@ -86,7 +86,11 @@ Tin_Vec3 tin_bwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
 
 typedef struct {
 	Tin_Vec3  *vertices;
+	int       *faceIndices;
+	int       *faceOffsets;
+	Tin_Vec3  *faceNormals;
 	int        numVertices;
+	int        numFaces;
 } Tin_Polytope;
 
 Tin_Vec3 tin_polytope_support(const void *geometry, Tin_Vec3 dir);
@@ -183,7 +187,7 @@ typedef struct {
 int tin_polytope_collide(
 	const Tin_Polytope *pa, const Tin_Transform *ta,
 	const Tin_Polytope *pb, const Tin_Transform *tb,
-	Tin_Contact *contact);
+	Tin_Contact *contacts);
 
 #define TIN_MAX_CONTACTS 5
 

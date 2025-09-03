@@ -411,54 +411,103 @@ tin_refine_portal(const void *geometry, Tin_SupportFunc support,
 
 /* === Contact Points === :contact: */
 
-void
-tin_calculate_contact(const Tin_Ray *r, const Tin_Portal *p, Tin_Contact *contact)
+int
+tin_clip_manifold_against_plane(const Tin_Vec3 *points, int count, Tin_Vec3 normal, Tin_Scalar base, Tin_Vec3 *newPoints)
 {
-	contact->normal = tin_normalize_v3(p->normal);
-
-#if 0
-	Tin_Vec3 ab = tin_sub_v3(p->b.abs, p->a.abs);
-	Tin_Vec3 ac = tin_sub_v3(p->c.abs, p->a.abs);
-	Tin_Scalar area_total = tin_prlgram_area(ab, ac);
-	if (area_total == 0.0f) {
-		contact->rel1 = p->a.relTo1;
-		contact->rel2 = p->a.relTo2;
-		fprintf(stderr, "Calculating contact point on collapsed portal.\n");
-		return;
+	int newCount = 0;
+	int j = count - 1;
+	Tin_Scalar pj = tin_dot_v3(normal, points[j]) - base;
+	for (int i = 0; i < count; i++) {
+		Tin_Scalar pi = tin_dot_v3(normal, points[i]) - base;
+		if (pi <= 0.0) {
+			if (!(pj <= 0.0)) {
+				Tin_Vec3 dir = tin_sub_v3(points[i], points[j]);
+				Tin_Scalar t = (base - tin_dot_v3(normal, points[j])) / tin_dot_v3(normal, dir);
+				Tin_Vec3 x = tin_saxpy_v3(t, dir, points[j]);
+				newPoints[newCount++] = x;
+			}
+			newPoints[newCount++] = points[i];
+		} else {
+			if (pj <= 0.0) {
+				Tin_Vec3 dir = tin_sub_v3(points[i], points[j]);
+				Tin_Scalar t = (base - tin_dot_v3(normal, points[j])) / tin_dot_v3(normal, dir);
+				Tin_Vec3 x = tin_saxpy_v3(t, dir, points[j]);
+				newPoints[newCount++] = x;
+			}
+		}
+		j = i;
+		pj = pi;
 	}
-	Tin_Scalar proj = tin_dot_v3(p->normal, r->dir);
-	if (proj == 0.0f) {
-		contact->rel1 = p->a.relTo1;
-		contact->rel2 = p->a.relTo2;
-		fprintf(stderr, "Portal and contact normal have become parallel.\n");
-		return;
-	}
-	Tin_Scalar t = tin_dot_v3(p->normal, tin_sub_v3(p->a.abs, r->origin)) / proj;
-	Tin_Vec3 q = tin_saxpy_v3(t, r->dir, r->origin);
-	Tin_Vec3 aq = tin_sub_v3(q, p->a.abs);
-	Tin_Scalar area_b = tin_prlgram_area(aq, ac);
-	Tin_Scalar area_c = tin_prlgram_area(aq, ab);
-	Tin_Scalar beta = area_b / area_total;
-	Tin_Scalar gamma = area_c / area_total;
-	Tin_Scalar alpha = 1.0f - beta - gamma;
-	
-	contact->rel1 = tin_scale_v3(alpha, p->a.relTo1);
-	contact->rel1 = tin_saxpy_v3(beta,  p->b.relTo1, contact->rel1);
-	contact->rel1 = tin_saxpy_v3(gamma, p->c.relTo1, contact->rel1);
+	return newCount;
+}
 
-	contact->rel2 = tin_scale_v3(alpha, p->a.relTo2);
-	contact->rel2 = tin_saxpy_v3(beta,  p->b.relTo2, contact->rel2);
-	contact->rel2 = tin_saxpy_v3(gamma, p->c.relTo2, contact->rel2);
-#else
-	(void) r;
-#endif
+int
+tin_clip_manifolds(const Tin_Vec3 *pointsA, int countA, const Tin_Vec3 *pointsB, int countB, Tin_Vec3 perpendicular, Tin_Vec3 *newPoints)
+{
+	int newCount = countB;
+	memcpy(newPoints, pointsB, newCount * sizeof *newPoints);
+	int j = countA - 1;
+	for (int i = 0; i < countA; i++) {
+		if (newCount == 0) break;
+		Tin_Vec3 edge = tin_sub_v3(pointsA[i], pointsA[j]);
+		Tin_Vec3 normal = tin_cross_v3(edge, perpendicular); // TODO determine the correct winding here
+		normal = tin_normalize_v3(normal);
+		Tin_Scalar base = tin_dot_v3(normal, pointsA[i]);
+		Tin_Vec3 buffer[32];
+		printf("%d -> ", newCount);
+		newCount = tin_clip_manifold_against_plane(newPoints, newCount, normal, base, buffer);
+		printf("%d\n", newCount);
+		memcpy(newPoints, buffer, newCount * sizeof *newPoints);
+		j = i;
+	}
+	return newCount;
+}
+
+int
+tin_incident_face(const Tin_Polytope *polytope, Tin_Vec3 dir)
+{
+	int bestFace = -1;
+	Tin_Scalar bestScore = -INFINITY;
+	for (int f = 0; f < polytope->numFaces; f++) {
+		Tin_Scalar score = tin_dot_v3(dir, polytope->faceNormals[f]);
+		if (score > bestScore) {
+			bestFace = f;
+			bestScore = score;
+		}
+	}
+	return bestFace;
+}
+
+int
+tin_reduce_manifold(Tin_Vec3 *points, int count)
+{
+	int idx = -1;
+	Tin_Scalar bestScore = -INFINITY;
+	for (int i = 0; i < count; i++) {
+		int j1 = i - 1;
+		if (j1 < 0) j1 = count - 1;
+		int j2 = i + 1;
+		if (j2 >= count) j2 = 0;
+		Tin_Vec3 e1 = tin_sub_v3(points[i], points[j1]);
+		Tin_Vec3 e2 = tin_sub_v3(points[j2], points[i]);
+		Tin_Scalar score = tin_prlgram_area(e1, e2);
+		if (score < bestScore) {
+			idx = i;
+			bestScore = score;
+		}
+	}
+	count -= 1;
+	if (count - idx > 0) {
+		memmove(points + idx, points + idx + 1, (count - idx) * sizeof *points);
+	}
+	return count;
 }
 
 int
 tin_polytope_collide(
 	const Tin_Polytope *pa, const Tin_Transform *ta,
 	const Tin_Polytope *pb, const Tin_Transform *tb,
-	Tin_Contact *contact)
+	Tin_Contact *contacts)
 {
 	Tin_Polysum ps = { pa, ta, pb, tb };
 
@@ -468,7 +517,7 @@ tin_polytope_collide(
 	Tin_Scalar norm = sqrt(tin_dot_v3(r.dir, r.dir));
 	if (norm == 0.0f) {
 		/* FIXME */
-		return 1;
+		return 0;
 	}
 	r.dir = tin_normalize_v3(r.dir);
 
@@ -494,14 +543,50 @@ tin_polytope_collide(
 		np.normal = tin_normalize_v3(np.normal);
 
 		Tin_Scalar proj = tin_dot_v3(p.normal, np.normal);
-		p = np; /* unintentional, i swear */
+		p = np; /* lol */
 		r = nr;
 		if (proj >= 0.99f) break;
 	}
 
-	tin_calculate_contact(&r, &p, contact);
-	contact->rel1Normal = tin_bwtrf_dir(ta, contact->normal);
-	return 1;
+	int faceA = tin_incident_face(pa, tin_bwtrf_dir(ta, p.normal));
+	printf("faceA: %d\n", faceA);
+	Tin_Vec3 pointsA[32];
+	int countA = 0;
+	for (int i = pa->faceOffsets[faceA]; i < pa->faceOffsets[faceA+1]; i++) {
+		int idx = pa->faceIndices[i];
+		pointsA[countA++] = tin_fwtrf_point(ta, pa->vertices[idx]);
+	}
+
+	Tin_Vec3 refNormal = tin_fwtrf_dir(ta, pa->faceNormals[faceA]);
+	Tin_Scalar refBase = tin_dot_v3(refNormal, pointsA[0]);
+
+	int faceB = tin_incident_face(pb, tin_bwtrf_dir(tb, tin_neg_v3(refNormal)));
+	Tin_Vec3 pointsB[32];
+	int countB = 0;
+	for (int i = pb->faceOffsets[faceB]; i < pb->faceOffsets[faceB+1]; i++) {
+		int idx = pb->faceIndices[i];
+		pointsB[countB++] = tin_fwtrf_point(tb, pb->vertices[idx]);
+	}
+
+	Tin_Vec3 manifold[32];
+	int count = tin_clip_manifolds(pointsA, countA, pointsB, countB, refNormal, manifold);
+
+	while (count > TIN_MAX_CONTACTS) {
+		count = tin_reduce_manifold(manifold, count);
+	}
+
+	memset(contacts, 0, count * sizeof *contacts);
+	for (int i = 0; i < count; i++) {
+		Tin_Scalar projDist = tin_dot_v3(refNormal, manifold[i]) - refBase;
+		Tin_Vec3 projPoint = tin_saxpy_v3(-projDist, refNormal, manifold[i]);
+		contacts[i].rel1 = tin_bwtrf_point(ta, projPoint);
+		contacts[i].rel2 = tin_bwtrf_point(tb, manifold[i]);
+		contacts[i].normal = refNormal;
+		contacts[i].rel1Normal = tin_bwtrf_dir(ta, refNormal);
+		contacts[i].position = manifold[i];
+	}
+
+	return count;
 }
 
 Tin_Scalar
@@ -1050,15 +1135,21 @@ tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2)
 	Tin_Arbiter *arbiter = tin_find_arbiter(scene, body1, body2);
 	if (!arbiter) return;
 
-	Tin_Contact contact;
-	int colliding = tin_polytope_collide(
+	int numContacts = tin_polytope_collide(
 			&body1->shape->polytope, &body1->transform,
-			&body2->shape->polytope, &body2->transform, &contact);
+			&body2->shape->polytope, &body2->transform, arbiter->contacts);
+	arbiter->numContacts = numContacts;
 
-	if (colliding) {
+	if (numContacts) {
+		printf("%d contacts: ", numContacts);
+		for (int c = 0; c < numContacts; c++) {
+			const Tin_Contact *contact = &arbiter->contacts[c];
+			printf(" (%f, %f, %f)", contact->position.c[0], contact->position.c[1], contact->position.c[2]);
+		}
+		printf("\n");
 		/*printf("D %f\n", tin_dot_v3(contact.normal,
 					tin_sub_v3(body2->transform.translation, body1->transform.translation)));*/
-		tin_arbiter_add_contact(arbiter, contact);
+		//tin_arbiter_add_contact(arbiter, contact);
 	}
 }
 

@@ -96,10 +96,39 @@ init_cube(void)
 		0, 2, 4, 2, 4, 6,
 		1, 3, 5, 3, 5, 7,
 	};
+	static int faceIndices[] = {
+		0, 2, 3, 1,
+		4, 5, 7, 6,
+		0, 1, 5, 4,
+		2, 6, 7, 3,
+		0, 4, 6, 2,
+		1, 3, 7, 5,
+	};
+	static int faceOffsets[] = {
+		0,
+		4,
+		8,
+		12,
+		16,
+		20,
+		24,
+	};
+	static Tin_Vec3 faceNormals[] = {
+		{{ 0.0, 0.0,-1.0}},
+		{{ 0.0, 0.0, 1.0}},
+		{{ 0.0,-1.0, 0.0}},
+		{{ 0.0, 1.0, 0.0}},
+		{{-1.0, 0.0, 0.0}},
+		{{ 1.0, 0.0, 0.0}},
+	};
 
 	cube_shape.kind = TIN_POLYTOPE;
 	cube_shape.polytope.vertices = verts;
 	cube_shape.polytope.numVertices = 8;
+	cube_shape.polytope.faceIndices = faceIndices;
+	cube_shape.polytope.faceOffsets = faceOffsets;
+	cube_shape.polytope.faceNormals = faceNormals;
+	cube_shape.polytope.numFaces = 6;
 	cube_shape.radius = sqrtf(3.0f);
 	cube_shape.invInertia = (Tin_Vec3) {{ 6.0f, 6.0f, 6.0f }};
 	
@@ -248,6 +277,7 @@ main(void)
 	scene.arbiterAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Arbiter), custom_alloc, custom_free };
 	scene.jointAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Joint), custom_alloc, custom_free };
 
+	/*
 	Tin_Body *body1 = tin_add_body(&scene, &cone_shape, 1.0 / 1.0);
 	body1->transform.translation = TIN_VEC3(0.0, 1.5, 0.0);
 	objects[num_objects++] = (Object){
@@ -255,6 +285,7 @@ main(void)
 		&cone_model,
 		{{ 0.5f, 1.0f, 0.5f }}
 	};
+	*/
 
 	Tin_Body *body2 = tin_add_body(&scene, &cube_shape, 1.0 / 3.0);
 	body2->transform.translation = TIN_VEC3(0.0, -1.0, 0.0);
@@ -274,11 +305,13 @@ main(void)
 		{{ 1.0f, 1.0f, 1.0f }}
 	};
 
+	/*
 	Tin_Joint *joint = tin_add_joint(&scene);
 	joint->body1 = body1;
 	joint->body2 = body2;
 	joint->relTo1 = (Tin_Vec3){{ 0.0f, -1.505f, 0.0f }};
 	joint->relTo2 = (Tin_Vec3){{ 0.0f, 1.005f, 0.0f }};
+	*/
 
 	double accumTimings[6];
 
