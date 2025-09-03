@@ -389,8 +389,8 @@ main(void)
 				Tin_Arbiter *arbiter = payload;
 				for (int c = 0; c < arbiter->numContacts; c++) {
 					Tin_Contact *contact = &arbiter->contacts[c];
-					render_push_vertex(contact->position);
-					render_push_vertex(tin_saxpy_v3(contact->separation, contact->normal, contact->position));
+					render_push_vertex(tin_fwtrf_point(&arbiter->body1->transform, contact->rel1));
+					render_push_vertex(tin_fwtrf_point(&arbiter->body2->transform, contact->rel2));
 				}
 			}
 		}

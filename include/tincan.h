@@ -170,17 +170,13 @@ typedef struct {
 	Tin_Vec3   rel1;
 	Tin_Vec3   rel2;
 	Tin_Vec3   normal;
-	Tin_Vec3   rel1Normal;
-	Tin_Scalar baseStretch;
 
-	Tin_Vec3   position;
 	Tin_Scalar separation;
 	
 	Tin_Scalar jacobian[12];
 	Tin_Scalar bias;
 	Tin_Scalar ineqAccum;
 	Tin_Scalar tangentAccum;
-	Tin_Scalar bitangentAccum;
 	Tin_Scalar effectiveMass[3];
 } Tin_Contact;
 
