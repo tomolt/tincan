@@ -89,7 +89,7 @@ typedef struct {
 	int        numVertices;
 } Tin_Polytope;
 
-Tin_Vec3 tin_polytope_support(const Tin_Polytope *polytope, Tin_Vec3 dir);
+Tin_Vec3 tin_polytope_support(const void *geometry, Tin_Vec3 dir);
 
 /* === Shapes === :shape: */
 
@@ -134,14 +134,7 @@ typedef struct {
 	const Tin_Transform *transform2;
 } Tin_Polysum;
 
-/* === A point in a polytope sum === :psum: */
-typedef struct {
-	Tin_Vec3 abs;
-	Tin_Vec3 relTo1;
-	Tin_Vec3 relTo2;
-} Tin_Pspoint;
-
-void tin_polysum_support(const Tin_Polysum *s, Tin_Vec3 dir, Tin_Pspoint *sup);
+Tin_Vec3 tin_polysum_support(const void *geometry, Tin_Vec3 dir);
 
 /* === Minkowski Portal Refinement === :mpr: */
 
@@ -151,8 +144,8 @@ typedef struct {
 } Tin_Ray;
 
 typedef struct {
-	Tin_Pspoint a, b, c;
-	Tin_Vec3    normal;
+	Tin_Vec3 a, b, c;
+	Tin_Vec3 normal;
 } Tin_Portal;
 
 typedef struct {
@@ -160,8 +153,12 @@ typedef struct {
 	Tin_Body *bodyB;
 } Tin_Collision;
 
-int  tin_construct_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p);
-void tin_refine_portal   (const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p);
+typedef Tin_Vec3 Tin_SupportFunc(const void *, Tin_Vec3);
+
+int tin_construct_portal(const void *geometry, Tin_SupportFunc support,
+	const Tin_Ray *r, Tin_Portal *p);
+void tin_refine_portal   (const void *geometry, Tin_SupportFunc support,
+	const Tin_Ray *r, Tin_Portal *p);
 
 /* === Contact Points === :contact: */
 

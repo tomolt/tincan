@@ -218,8 +218,9 @@ tin_bwtrf_dir(const Tin_Transform *transform, Tin_Vec3 vec)
 /* === Polytopes === :poly: */
 
 Tin_Vec3
-tin_polytope_support(const Tin_Polytope *polytope, Tin_Vec3 dir)
+tin_polytope_support(const void *geometry, Tin_Vec3 dir)
 {
+	const Tin_Polytope *polytope = geometry;
 	Tin_Scalar bestScore = -INFINITY;
 	int bestIdx = -1;
 	for (int idx = 0; idx < polytope->numVertices; idx++) {
@@ -232,18 +233,20 @@ tin_polytope_support(const Tin_Polytope *polytope, Tin_Vec3 dir)
 	return polytope->vertices[bestIdx];
 }
 
-void
-tin_polysum_support(const Tin_Polysum *s, Tin_Vec3 dir, Tin_Pspoint *sup)
+Tin_Vec3
+tin_polysum_support(const void *geometry, Tin_Vec3 dir)
 {
+	const Tin_Polysum *s = geometry;
+
 	Tin_Vec3 former_dir = tin_bwtrf_dir(s->transform1, dir);
-	sup->relTo1 = tin_polytope_support(s->polytope1, former_dir);
-	Tin_Vec3 former_abs = tin_fwtrf_point(s->transform1, sup->relTo1);
+	Tin_Vec3 relTo1 = tin_polytope_support(s->polytope1, former_dir);
+	Tin_Vec3 former_abs = tin_fwtrf_point(s->transform1, relTo1);
 
 	Tin_Vec3 latter_dir = tin_bwtrf_dir(s->transform2, tin_neg_v3(dir));
-	sup->relTo2 = tin_polytope_support(s->polytope2, latter_dir);
-	Tin_Vec3 latter_abs = tin_fwtrf_point(s->transform2, sup->relTo2);
+	Tin_Vec3 relTo2 = tin_polytope_support(s->polytope2, latter_dir);
+	Tin_Vec3 latter_abs = tin_fwtrf_point(s->transform2, relTo2);
 
-	sup->abs = tin_sub_v3(former_abs, latter_abs);
+	return tin_sub_v3(former_abs, latter_abs);
 }
 
 /* === Shapes === :shape: */
@@ -279,14 +282,15 @@ tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_Vec3 
 /* === Minkowski Portal Refinement === :mpr: */
 
 int
-tin_construct_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
+tin_construct_portal(const void *geometry, Tin_SupportFunc support,
+	const Tin_Ray *r, Tin_Portal *p)
 {
 	/* find the very first point */
-	tin_polysum_support(ps, r->dir, &p->a);
+	p->a = support(geometry, r->dir);
 
 	/* find the second point */
 	{
-		Tin_Vec3 oa = tin_sub_v3(p->a.abs, r->origin);
+		Tin_Vec3 oa = tin_sub_v3(p->a, r->origin);
 		Tin_Vec3 dir = tin_gram_schmidt(oa, r->dir);
 		if (tin_dot_v3(dir, dir) == 0.0f) {
 			dir = tin_gram_schmidt(oa, (Tin_Vec3) {{ 1.0f, 0.0f, 0.0f }});
@@ -295,7 +299,7 @@ tin_construct_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
 			}
 		}
 		dir = tin_normalize_v3(dir);
-		tin_polysum_support(ps, dir, &p->b);
+		p->b = support(geometry, dir);
 	}
 
 	for (int it = 0;; it++) {
@@ -305,18 +309,18 @@ tin_construct_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
 		}
 
 		/*  */
-		Tin_Vec3 oa = tin_sub_v3(p->a.abs, r->origin);
-		Tin_Vec3 ob = tin_sub_v3(p->b.abs, r->origin);
+		Tin_Vec3 oa = tin_sub_v3(p->a, r->origin);
+		Tin_Vec3 ob = tin_sub_v3(p->b, r->origin);
 		Tin_Vec3 dir = tin_cross_v3(oa, ob);
 		if (tin_dot_v3(dir, r->dir) < 0.0f) {
 			dir = tin_neg_v3(dir);
 		}
-		tin_polysum_support(ps, dir, &p->c);
-		Tin_Scalar score = tin_dot_v3(dir, p->c.abs);
-		if (score <= tin_dot_v3(dir, p->a.abs) || score <= tin_dot_v3(dir, p->b.abs)) {
+		p->c = support(geometry, dir);
+		Tin_Scalar score = tin_dot_v3(dir, p->c);
+		if (score <= tin_dot_v3(dir, p->a) || score <= tin_dot_v3(dir, p->b)) {
 			return 0;
 		}
-		Tin_Vec3 oc = tin_sub_v3(p->c.abs, r->origin);
+		Tin_Vec3 oc = tin_sub_v3(p->c, r->origin);
 		
 		/*  */
 		Tin_Vec3 an = tin_cross_v3(ob, oc);
@@ -337,21 +341,22 @@ tin_construct_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
 }
 
 void
-tin_refine_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
+tin_refine_portal(const void *geometry, Tin_SupportFunc support,
+	const Tin_Ray *r, Tin_Portal *p)
 {
-	Tin_Vec3 ab = tin_sub_v3(p->b.abs, p->a.abs);
-	Tin_Vec3 ac = tin_sub_v3(p->c.abs, p->a.abs);
+	Tin_Vec3 ab = tin_sub_v3(p->b, p->a);
+	Tin_Vec3 ac = tin_sub_v3(p->c, p->a);
 	p->normal = tin_cross_v3(ab, ac);
 	if (tin_dot_v3(p->normal, r->dir) < 0.0f) {
-		Tin_Pspoint temp;
+		Tin_Vec3 temp;
 		temp = p->a;
 		p->a = p->b;
 		p->b = temp;
 	}
 
 	for (int it = 0;; it++) {
-		Tin_Vec3 ab = tin_sub_v3(p->b.abs, p->a.abs);
-		Tin_Vec3 ac = tin_sub_v3(p->c.abs, p->a.abs);
+		Tin_Vec3 ab = tin_sub_v3(p->b, p->a);
+		Tin_Vec3 ac = tin_sub_v3(p->c, p->a);
 		p->normal = tin_cross_v3(ab, ac);
 
 		if (tin_dot_v3(p->normal, p->normal) == 0.0f) {
@@ -359,13 +364,12 @@ tin_refine_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
 			break;
 		}
 
-		Tin_Pspoint s;
-		tin_polysum_support(ps, p->normal, &s);
+		Tin_Vec3 s = support(geometry, p->normal);
 		
 		{
-			Tin_Scalar sScore = tin_dot_v3(s.abs, p->normal);
+			Tin_Scalar sScore = tin_dot_v3(s, p->normal);
 			if (sScore <= 0.0f) break;
-			Tin_Scalar aScore = tin_dot_v3(p->a.abs, p->normal);
+			Tin_Scalar aScore = tin_dot_v3(p->a, p->normal);
 			if (sScore <= aScore * 1.01f) break;
 			if (sScore - aScore <= 1e-6f) break;
 		}
@@ -373,21 +377,21 @@ tin_refine_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
 		if (it >= 100) {
 			fprintf(stderr, "MPR refine_portal() took too many iterations.\n");
 			fprintf(stderr, "\tnormal length squared: %f\n", tin_dot_v3(p->normal, p->normal));
-			Tin_Scalar aScore = tin_dot_v3(p->a.abs, p->normal);
-			Tin_Scalar sScore = tin_dot_v3(s.abs, p->normal);
+			Tin_Scalar aScore = tin_dot_v3(p->a, p->normal);
+			Tin_Scalar sScore = tin_dot_v3(s, p->normal);
 			fprintf(stderr, "\taScore: %e\n", aScore);
 			fprintf(stderr, "\tsScore: %e\n", sScore);
 			break;
 		}
 
-		Tin_Vec3 os = tin_sub_v3(s.abs, r->origin);
+		Tin_Vec3 os = tin_sub_v3(s, r->origin);
 		Tin_Vec3 d_x_os = tin_cross_v3(r->dir, os);
 		
 		/* if <D , (OS x OA)> > 0 */
-		Tin_Vec3 oa = tin_sub_v3(p->a.abs, r->origin);
+		Tin_Vec3 oa = tin_sub_v3(p->a, r->origin);
 		if (tin_dot_v3(oa, d_x_os) > 0.0f) {
 			/* if <D , (OS x OB)> > 0 */
-			Tin_Vec3 ob = tin_sub_v3(p->b.abs, r->origin);
+			Tin_Vec3 ob = tin_sub_v3(p->b, r->origin);
 			if (tin_dot_v3(ob, d_x_os) > 0.0f) {
 				p->a = s; /* SBC */
 			} else {
@@ -395,7 +399,7 @@ tin_refine_portal(const Tin_Polysum *ps, const Tin_Ray *r, Tin_Portal *p)
 			}
 		} else {
 			/* if <D , (OS x OC)> > 0 */
-			Tin_Vec3 oc = tin_sub_v3(p->c.abs, r->origin);
+			Tin_Vec3 oc = tin_sub_v3(p->c, r->origin);
 			if (tin_dot_v3(oc, d_x_os) > 0.0f) {
 				p->b = s; /* ASC */
 			} else {
@@ -412,6 +416,7 @@ tin_calculate_contact(const Tin_Ray *r, const Tin_Portal *p, Tin_Contact *contac
 {
 	contact->normal = tin_normalize_v3(p->normal);
 
+#if 0
 	Tin_Vec3 ab = tin_sub_v3(p->b.abs, p->a.abs);
 	Tin_Vec3 ac = tin_sub_v3(p->c.abs, p->a.abs);
 	Tin_Scalar area_total = tin_prlgram_area(ab, ac);
@@ -444,6 +449,9 @@ tin_calculate_contact(const Tin_Ray *r, const Tin_Portal *p, Tin_Contact *contac
 	contact->rel2 = tin_scale_v3(alpha, p->a.relTo2);
 	contact->rel2 = tin_saxpy_v3(beta,  p->b.relTo2, contact->rel2);
 	contact->rel2 = tin_saxpy_v3(gamma, p->c.relTo2, contact->rel2);
+#else
+	(void) r;
+#endif
 }
 
 int
@@ -465,12 +473,12 @@ tin_polytope_collide(
 	r.dir = tin_normalize_v3(r.dir);
 
 	Tin_Portal p;
-	if (!tin_construct_portal(&ps, &r, &p)) {
+	if (!tin_construct_portal(&ps, tin_polysum_support, &r, &p)) {
 		return 0;
 	}
-	tin_refine_portal(&ps, &r, &p);
+	tin_refine_portal(&ps, tin_polysum_support, &r, &p);
 	p.normal = tin_normalize_v3(p.normal);
-	if (tin_dot_v3(p.normal, p.a.abs) <= 0.0f) {
+	if (tin_dot_v3(p.normal, p.a) <= 0.0f) {
 		return 0;
 	}
 
@@ -479,10 +487,10 @@ tin_polytope_collide(
 		nr.dir    = p.normal;
 		nr.origin = (Tin_Vec3) {{ 0.0f, 0.0f, 0.0f }};
 		Tin_Portal np;
-		if (!tin_construct_portal(&ps, &nr, &np)) {
+		if (!tin_construct_portal(&ps, tin_polysum_support, &nr, &np)) {
 			break;
 		}
-		tin_refine_portal(&ps, &nr, &np);
+		tin_refine_portal(&ps, tin_polysum_support, &nr, &np);
 		np.normal = tin_normalize_v3(np.normal);
 
 		Tin_Scalar proj = tin_dot_v3(p.normal, np.normal);
