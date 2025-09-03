@@ -6,6 +6,13 @@
 
 #define M4(A,i,j) ((A.c)+4*(i)+(j))
 
+const Mat4 mat4_identity = {{
+	[ 0] = 1.0,
+	[ 5] = 1.0,
+	[10] = 1.0,
+	[15] = 1.0,
+}};
+
 Mat4
 mat4_transpose(Mat4 matrix)
 {
@@ -32,14 +39,14 @@ mat4_perspective(Tin_Scalar fovy, Tin_Scalar aspect, Tin_Scalar near, Tin_Scalar
 }
 
 Mat4
-mat4_orthographic(int width, int height, Tin_Scalar near, Tin_Scalar far)
+mat4_orthographic(Tin_Scalar left, Tin_Scalar right, Tin_Scalar bottom, Tin_Scalar top, Tin_Scalar near, Tin_Scalar far)
 {
 	Mat4 D = {{ 0 }};
-	*M4(D,0,0) =  2.0f / width;
-	*M4(D,1,1) =  2.0f / height;
+	*M4(D,0,0) =  2.0f / (right - left);
+	*M4(D,1,1) =  2.0f / (top - bottom);
 	*M4(D,2,2) = -2.0f / (far - near);
-	*M4(D,3,0) = -1.0f;
-	*M4(D,3,1) = -1.0f;
+	*M4(D,3,0) = -(right + left) / (right - left);
+	*M4(D,3,1) = -(top + bottom) / (top - bottom);
 	*M4(D,3,2) = -(far + near) / (far - near);
 	*M4(D,3,3) =  1.0f;
 	return D;

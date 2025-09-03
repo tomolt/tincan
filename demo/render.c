@@ -12,8 +12,8 @@
 #define MODEL_IBO_CAPACITY   4096
 #define OVERLAY_VBO_CAPACITY (16 * 1024)
 
-#define SHADOW_WIDTH 1024
-#define SHADOW_HEIGHT 1024
+#define SHADOW_WIDTH 2048
+#define SHADOW_HEIGHT 2048
 
 static GLuint  model_prog;
 static GLuint  model_uniforms[6];
@@ -24,7 +24,7 @@ static GLsizei model_vbo_count;
 static GLsizei model_ibo_count;
 
 static GLuint  overlay_prog;
-static GLuint  overlay_uniforms[3];
+static GLuint  overlay_uniforms[4];
 static GLuint  overlay_vbo;
 static GLuint  overlay_vao;
 static GLsizei overlay_vbo_start;
@@ -69,9 +69,18 @@ static const char *model_frag_src =
 	"	projPos = projPos * 0.5 + 0.5;\n"
 	"	float closestDepth = texture(shadowSampler, projPos.xy).r;\n"
 	"	float currentDepth = projPos.z;\n"
-	"	float lightMask = currentDepth > closestDepth ? 0.0 : 1.0;\n"
-	"	float diffuse = lightMask * max(dot(normal, -light_dir), 0.0);\n"
-	"	frag_color = base_color * (0.8 * diffuse + 0.2);\n"
+	"	float cosAngle = max(dot(normal, -light_dir), 0.0);\n"
+	"	float bias = 0.001 * (1.0 - cosAngle) * (1.0 - cosAngle);\n"
+	"	float contrib = 0.0;\n"
+	"	vec2 texelSize = 1.0 / textureSize(shadowSampler, 0);\n"
+	"	for (int y = -1; y <= 1; y++) {\n"
+	"		for (int x = -1; x <= 1; x++) {\n"
+	"			float pcfDepth = texture(shadowSampler, projPos.xy + vec2(x, y) * texelSize).r;\n"
+	"			contrib += pcfDepth > currentDepth + bias ? 1.0 : 0.0;\n"
+	"		}\n"
+	"	}\n"
+	"	contrib /= 9.0;\n"
+	"	frag_color = base_color * (0.8 * contrib * cosAngle + 0.2);\n"
 	"}\n";
 
 static const char *overlay_frag_src =
@@ -143,8 +152,9 @@ init_progs(void)
 
 	overlay_prog = shader_link(common_vert, overlay_frag);
 	overlay_uniforms[0] = glGetUniformLocation(overlay_prog, "model_matrix");
-	overlay_uniforms[1] = glGetUniformLocation(overlay_prog, "proj_matrix");
-	overlay_uniforms[2] = glGetUniformLocation(overlay_prog, "base_color");
+	overlay_uniforms[1] = glGetUniformLocation(overlay_prog, "view_matrix");
+	overlay_uniforms[2] = glGetUniformLocation(overlay_prog, "proj_matrix");
+	overlay_uniforms[3] = glGetUniformLocation(overlay_prog, "base_color");
 
 	shadow_prog = shader_link(common_vert, -1);
 	
@@ -324,9 +334,10 @@ render_push_vertex(Tin_Vec3 v)
 void
 render_draw_lines(Tin_Vec3 color)
 {
-	glUniformMatrix4fv(overlay_uniforms[0], 1, GL_FALSE, render_view_matrix.c);
-	glUniformMatrix4fv(overlay_uniforms[1], 1, GL_FALSE, render_proj_matrix.c);
-	glUniform4f(overlay_uniforms[2], color.c[0], color.c[1], color.c[2], 1.0f);
+	glUniformMatrix4fv(overlay_uniforms[0], 1, GL_FALSE, mat4_identity.c);
+	glUniformMatrix4fv(overlay_uniforms[1], 1, GL_FALSE, render_view_matrix.c);
+	glUniformMatrix4fv(overlay_uniforms[2], 1, GL_FALSE, render_proj_matrix.c);
+	glUniform4f(overlay_uniforms[3], color.c[0], color.c[1], color.c[2], 1.0f);
 	glDrawArrays(GL_LINES, overlay_vbo_start, overlay_vbo_count);
 	overlay_vbo_start += overlay_vbo_count;
 	overlay_vbo_count  = 0;
@@ -335,9 +346,10 @@ render_draw_lines(Tin_Vec3 color)
 void
 render_draw_triangle_strip(Tin_Vec3 color)
 {
-	glUniformMatrix4fv(overlay_uniforms[0], 1, GL_FALSE, render_view_matrix.c);
-	glUniformMatrix4fv(overlay_uniforms[1], 1, GL_FALSE, render_proj_matrix.c);
-	glUniform4f(overlay_uniforms[2], color.c[0], color.c[1], color.c[2], 1.0f);
+	glUniformMatrix4fv(overlay_uniforms[0], 1, GL_FALSE, mat4_identity.c);
+	glUniformMatrix4fv(overlay_uniforms[1], 1, GL_FALSE, render_view_matrix.c);
+	glUniformMatrix4fv(overlay_uniforms[2], 1, GL_FALSE, render_proj_matrix.c);
+	glUniform4f(overlay_uniforms[3], color.c[0], color.c[1], color.c[2], 1.0f);
 	glDrawArrays(GL_TRIANGLE_STRIP, overlay_vbo_start, overlay_vbo_count);
 	overlay_vbo_start += overlay_vbo_count;
 	overlay_vbo_count  = 0;

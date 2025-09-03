@@ -356,9 +356,8 @@ main(void)
 		snprintf(title, sizeof title, "tincan physics demo - %02dms", (int)(elapsedTime * 1000.0f + 0.5f));
 		glfwSetWindowTitle(window, title);
 
-		//render_proj_matrix = mat4_orthographic(10.0, 10.0, 1.0, 100.0);
-		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 10.0f, 100.0f);
-		render_view_matrix = mat4_look_at(tin_scale_v3(-50.0, render_light_dir), TIN_VEC3(0, 0, 0), TIN_VEC3(0.0, 1.0, 0.0));
+		render_proj_matrix = mat4_orthographic(-25.0, 25.0, -25.0, 25.0, 1.0, 50.0);
+		render_view_matrix = mat4_look_at(tin_scale_v3(-25.0, render_light_dir), TIN_VEC3(0, 0, 0), TIN_VEC3(0.0, 1.0, 0.0));
 		render_light_matrix = mat4_multiply(render_proj_matrix, render_view_matrix);
 		render_start_shadow_pass();
 		draw_objects();
@@ -397,7 +396,7 @@ main(void)
 		}
 		render_draw_lines(TIN_VEC3(1.0, 0.0, 0.0));
 
-		render_proj_matrix = mat4_orthographic(width, height, -1.0, 1.0);
+		render_proj_matrix = mat4_orthographic(0, width, 0, height, -1.0, 1.0);
 		render_view_matrix = mat4_from_transform(&ident);
 		render_start_overlay();
 
