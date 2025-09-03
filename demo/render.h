@@ -4,15 +4,22 @@ typedef struct {
 	GLint      base_vertex;
 } Model;
 
+extern Mat4 shadow_view_matrix;
+extern Mat4 shadow_proj_matrix;
+
 extern Mat4 render_view_matrix;
 extern Mat4 render_proj_matrix;
+extern Mat4 render_light_matrix;
+
+extern Tin_Vec3 render_light_dir;
 
 void render_init(void);
 void render_deinit(void);
 
 Model render_make_model(int nverts, const Tin_Vec3 *verts, int nindices, const GLushort *indices);
 
-void render_start_models(void);
+void render_start_shadow_pass(void);
+void render_start_scene_pass(int width, int height);
 void render_draw_model(const Model *model, const Tin_Transform *transform, Tin_Vec3 color);
 
 void render_start_overlay(void);

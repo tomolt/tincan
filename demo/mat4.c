@@ -32,15 +32,15 @@ mat4_perspective(Tin_Scalar fovy, Tin_Scalar aspect, Tin_Scalar near, Tin_Scalar
 }
 
 Mat4
-mat4_orthographic(int width, int height)
+mat4_orthographic(int width, int height, Tin_Scalar near, Tin_Scalar far)
 {
 	Mat4 D = {{ 0 }};
 	*M4(D,0,0) =  2.0f / width;
 	*M4(D,1,1) =  2.0f / height;
-	*M4(D,2,2) = -1.0f;
+	*M4(D,2,2) = -2.0f / (far - near);
 	*M4(D,3,0) = -1.0f;
 	*M4(D,3,1) = -1.0f;
-	*M4(D,3,2) =  0.0f;
+	*M4(D,3,2) = -(far + near) / (far - near);
 	*M4(D,3,3) =  1.0f;
 	return D;
 }
@@ -117,3 +117,27 @@ mat4_multiply(Mat4 A, Mat4 B)
 	return D;
 }
 
+Mat4
+mat4_look_at(Tin_Vec3 eye, Tin_Vec3 center, Tin_Vec3 up)
+{
+    Tin_Vec3 f = tin_normalize_v3(tin_sub_v3(center, eye));
+    Tin_Vec3 u = tin_normalize_v3(up);
+    Tin_Vec3 s = tin_normalize_v3(tin_cross_v3(f, u));
+    u = tin_cross_v3(s, f);
+
+    Mat4 M = {{ 0 }};
+    *M4(M,0,0) =  s.c[0];
+    *M4(M,1,0) =  s.c[1];
+    *M4(M,2,0) =  s.c[2];
+    *M4(M,0,1) =  u.c[0];
+    *M4(M,1,1) =  u.c[1];
+    *M4(M,2,1) =  u.c[2];
+    *M4(M,0,2) = -f.c[0];
+    *M4(M,1,2) = -f.c[1];
+    *M4(M,2,2) = -f.c[2];
+    *M4(M,3,0) = -tin_dot_v3(s, eye);
+    *M4(M,3,1) = -tin_dot_v3(u, eye);
+    *M4(M,3,2) =  tin_dot_v3(f, eye);
+    *M4(M,3,3) =  1.0;
+    return M;
+}

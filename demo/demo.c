@@ -89,12 +89,12 @@ init_cube(void)
 		{{  1,  1,  1 }},
 	};
 	static GLushort indices[] = {
-		0, 1, 2, 1, 2, 3,
-		4, 5, 6, 5, 6, 7,
-		0, 1, 4, 1, 4, 5,
-		2, 3, 6, 3, 6, 7,
-		0, 2, 4, 2, 4, 6,
-		1, 3, 5, 3, 5, 7,
+		0, 2, 3, 3, 1, 0,
+		4, 5, 7, 7, 6, 4,
+		0, 1, 5, 5, 4, 0,
+		2, 6, 7, 7, 3, 2,
+		0, 4, 6, 6, 2, 0,
+		1, 3, 7, 7, 5, 1,
 	};
 	static int faceIndices[] = {
 		0, 2, 3, 1,
@@ -232,6 +232,19 @@ mouse_callback(GLFWwindow *window, double x, double y)
         cam->cursor_y = y;
 }
 
+static void
+draw_objects(void)
+{
+	for (int o = 0; o < num_objects; o++) {
+		const Object *obj = &objects[o];
+		Tin_Vec3 color = obj->color;
+		if (tin_island_find(obj->body)->islandStable && obj->body->invMass != 0.0) {
+			color = tin_saxpy_v3(0.5, color, TIN_VEC3(0.5, 0.5, 0.5));
+		}
+		render_draw_model(obj->model, &obj->body->transform, color);
+	}
+}
+
 void *
 custom_alloc(void *userPointer)
 {
@@ -263,6 +276,7 @@ main(void)
 	gladLoadGL(glfwGetProcAddress);
 	glEnable(GL_DEPTH_TEST);
 	render_init();
+	render_light_dir = tin_normalize_v3(TIN_VEC3(-0.3, -0.6, 0.0));
 	init_cone(16);
 	init_cube();
 
@@ -323,19 +337,11 @@ main(void)
 
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
-		glViewport(0, 0, width, height);
-
-		glClearColor(0.7f, 0.9f, 0.1f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		Tin_Transform camtrf;
 		camera_transform(&camera, &camtrf);
 
 		Tin_Transform ident = { .rotation = { 1, 0, 0, 0, 1, 0, 0, 0, 1 }, .scale = 1.0f };
-
-		render_start_models();
-		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);
-		render_view_matrix = mat4_from_inverse_transform(&camtrf);
 
 		double startTime = glfwGetTime();
 		double timings[6];
@@ -350,73 +356,17 @@ main(void)
 		snprintf(title, sizeof title, "tincan physics demo - %02dms", (int)(elapsedTime * 1000.0f + 0.5f));
 		glfwSetWindowTitle(window, title);
 
-		/* draw contact points */
-#if 0
-		for (int a = 0; a < num_objects; a++) {
-			for (int b = a + 1; b < num_objects; b++) {
-				Tin_Arbiter *arbiter = &arbiters[a * MAX_OBJECTS + b];
-				for (int i = 0; i < arbiter->numContacts; i++) {
-					const Tin_Contact *c = &arbiter->contacts[i];
-					Tin_Vec3 color = {{ 0.0f, 1.0f, 1.0f }};
-					Tin_Transform trf = ident;
-					trf.scale = 0.1f;
-					trf.translation = tin_fwtrf_point(&objects[a].body.transform, c->rel1);
-					render_draw_model(&cone_model, &trf, color);
-					trf.translation = tin_fwtrf_point(&objects[b].body.transform, c->rel2);
-					render_draw_model(&cube_model, &trf, color);
-				}
-			}
-		}
-#endif
+		//render_proj_matrix = mat4_orthographic(10.0, 10.0, 1.0, 100.0);
+		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 10.0f, 100.0f);
+		render_view_matrix = mat4_look_at(tin_scale_v3(-50.0, render_light_dir), TIN_VEC3(0, 0, 0), TIN_VEC3(0.0, 1.0, 0.0));
+		render_light_matrix = mat4_multiply(render_proj_matrix, render_view_matrix);
+		render_start_shadow_pass();
+		draw_objects();
 
-#if 0
-		/* draw joints */
-		TIN_FOR_EACH(joint, scene.joints, Tin_Joint, node) {
-			const Tin_Vec3 color1 = {{ 1.0f, 1.0f, 1.0f }};
-			const Tin_Vec3 color2 = {{ 0.0f, 0.0f, 0.0f }};
-
-			Tin_Transform trf = ident;
-			trf.scale = 0.1f;
-			
-			trf.translation = tin_fwtrf_point(&joint->body1->transform, joint->relTo1);
-			render_draw_model(&cube_model, &trf, color1);
-			trf.translation = tin_sub_v3(trf.translation, joint->debugImpulse);
-			render_draw_model(&cone_model, &trf, color1);
-
-			trf.translation = tin_fwtrf_point(&joint->body2->transform, joint->relTo2);
-			render_draw_model(&cube_model, &trf, color2);
-			trf.translation = tin_add_v3(trf.translation, joint->debugImpulse);
-			render_draw_model(&cone_model, &trf, color2);
-		}
-#endif
-
-		for (int o = 0; o < num_objects; o++) {
-			const Object *obj = &objects[o];
-			Tin_Polytope dot;
-			dot.numVertices = 1;
-			dot.vertices = malloc(1 * sizeof *dot.vertices);
-			dot.vertices[0] = (Tin_Vec3) {{ 0.0f, 0.0f, 0.0f }};
-			/* ray picking (outdated code) */
-#if 0
-			Tin_Polysum sum;
-			sum.polytope1 = obj->body->shape->polytope;
-			sum.transform1 = &obj->body.transform;
-			sum.polytope2 = &dot;
-			sum.transform2 = &ident;
-			Tin_Ray ray = { .origin = camtrf.translation, .dir = tin_apply_qt(camtrf.quaternion, (Tin_Vec3) {{ 0.0f, 0.0f, -1.0f }}) };
-			Tin_Portal temp_portal;
-			if (tin_construct_portal(&sum, &ray, &temp_portal)) {
-				color = (Tin_Vec3) {{ 1.0f, 0.0f, 0.0f }};
-			} else {
-				color = (Tin_Vec3) {{ 1.0f, 1.0f, 1.0f }};
-			}
-#endif
-			Tin_Vec3 color = obj->color;
-			if (tin_island_find(obj->body)->islandStable && obj->body->invMass != 0.0) {
-				color = tin_saxpy_v3(0.5, color, TIN_VEC3(0.5, 0.5, 0.5));
-			}
-			render_draw_model(obj->model, &obj->body->transform, color);
-		}
+		render_proj_matrix = mat4_perspective(70.0f, (float) width / height, 1.0f, 100.0f);
+		render_view_matrix = mat4_from_inverse_transform(&camtrf);
+		render_start_scene_pass(width, height);
+		draw_objects();
 
 		render_start_overlay();
 		for (int o = 0; o < num_objects; o++) {
@@ -447,7 +397,7 @@ main(void)
 		}
 		render_draw_lines(TIN_VEC3(1.0, 0.0, 0.0));
 
-		render_proj_matrix = mat4_orthographic(width, height);
+		render_proj_matrix = mat4_orthographic(width, height, -1.0, 1.0);
 		render_view_matrix = mat4_from_transform(&ident);
 		render_start_overlay();
 
