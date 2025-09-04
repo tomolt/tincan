@@ -162,8 +162,9 @@ void tin_refine_portal   (const void *geometry, Tin_SupportFunc support,
 /* === Contact Points === :contact: */
 
 typedef struct {
-	Tin_Vec3   rel1;
-	Tin_Vec3   rel2;
+	/* Vector from origin of body to the contact point on the body, in world-space. */
+	Tin_Vec3   posFrom1;
+	Tin_Vec3   posFrom2;
 
 	Tin_Scalar separation;
 	

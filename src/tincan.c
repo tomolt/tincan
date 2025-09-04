@@ -582,8 +582,8 @@ tin_polytope_collide(
 	for (int i = 0; i < count; i++) {
 		Tin_Scalar projDist = tin_dot_v3(refNormal, manifold[i]) - refBase;
 		Tin_Vec3 projPoint = tin_saxpy_v3(-projDist, refNormal, manifold[i]);
-		contacts[i].rel1 = tin_bwtrf_point(ta, projPoint);
-		contacts[i].rel2 = tin_bwtrf_point(tb, manifold[i]);
+		contacts[i].posFrom1 = tin_sub_v3(projPoint, ta->translation);
+		contacts[i].posFrom2 = tin_sub_v3(manifold[i], tb->translation);
 		Tin_Vec3 p1 = projPoint;
 		Tin_Vec3 p2 = manifold[i];
 		contacts[i].separation = tin_dot_v3(refNormal, tin_sub_v3(p2, p1));
@@ -712,23 +712,18 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	for (int i = 0; i < arbiter->numContacts; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
 
-		Tin_Vec3 r1 = tin_fwtrf_dir(&arbiter->body1->transform,
-			tin_scale_v3(arbiter->body1->transform.scale, contact->rel1));
-		Tin_Vec3 r2 = tin_fwtrf_dir(&arbiter->body2->transform,
-			tin_scale_v3(arbiter->body2->transform.scale, contact->rel2));
-
 		/* Precompute jacobian, effectiveMass, and bias */
-		tin_jacobian_along_axis(contact->jacobian, arbiter->normal, r1, r2);
+		tin_jacobian_along_axis(contact->jacobian, arbiter->normal, contact->posFrom1, contact->posFrom2);
 		contact->effectiveMass[0] = tin_effective_mass(arbiter->body1, arbiter->body2, contact->jacobian);
 
 		contact->bias = -biasFactor * invDt * MIN(0.0, contact->separation + allowedPenetration);
 
 		Tin_Scalar jacobian[12];
 
-		tin_jacobian_along_axis(jacobian, frictionDir, r1, r2);
+		tin_jacobian_along_axis(jacobian, frictionDir, contact->posFrom1, contact->posFrom2);
 		contact->effectiveMass[1] = tin_effective_mass(arbiter->body1, arbiter->body2, jacobian);
 
-		tin_jacobian_along_axis(jacobian, orthoDir, r1, r2);
+		tin_jacobian_along_axis(jacobian, orthoDir, contact->posFrom1, contact->posFrom2);
 		contact->effectiveMass[2] = tin_effective_mass(arbiter->body1, arbiter->body2, jacobian);
 
 		contact->ineqAccum = 0.0;
@@ -774,18 +769,13 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		Tin_Contact *contact = &arbiter->contacts[idx];
 		if (contact->separation >= 0.0) continue;
 
-		Tin_Vec3 r1 = tin_fwtrf_dir(&arbiter->body1->transform,
-			tin_scale_v3(arbiter->body1->transform.scale, contact->rel1));
-		Tin_Vec3 r2 = tin_fwtrf_dir(&arbiter->body2->transform,
-			tin_scale_v3(arbiter->body2->transform.scale, contact->rel2));
-
 		Tin_Scalar jacobian[12];
 
-		tin_jacobian_along_axis(jacobian, arbiter->frictionDir, r1, r2);
+		tin_jacobian_along_axis(jacobian, arbiter->frictionDir, contact->posFrom1, contact->posFrom2);
 		tin_enforce_jacobian(arbiter->body1, arbiter->body2, jacobian, contact->effectiveMass[1],
 			0.0f, &contact->tangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 
-		tin_jacobian_along_axis(jacobian, arbiter->orthoDir, r1, r2);
+		tin_jacobian_along_axis(jacobian, arbiter->orthoDir, contact->posFrom1, contact->posFrom2);
 		tin_enforce_jacobian(arbiter->body1, arbiter->body2, jacobian, contact->effectiveMass[2],
 			0.0f, &contact->bitangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 	}
