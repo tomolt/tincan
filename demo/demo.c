@@ -34,6 +34,9 @@ static Model     cube_model;
 
 static float time_multiplier = 1.0f;
 
+static bool throwing;
+static double latest_throw;
+
 static void
 init_cone(int tessel)
 {
@@ -181,21 +184,10 @@ key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 
 	case GLFW_KEY_SPACE:
 		if (action == GLFW_PRESS) {
-			if (num_objects >= MAX_OBJECTS) {
-				printf("Cannot spawn box: too many objects already present.\n");
-				break;
-			}
-			Tin_Vec3 forward = {{ -cam->rotation[6], -cam->rotation[7], -cam->rotation[8] }};
-			Tin_Body *body = tin_add_body(&scene, &cube_shape, 1.0 / 1.0);
-			memcpy(body->transform.rotation, cam->rotation, sizeof cam->rotation);
-			body->transform.translation = tin_saxpy_v3(1.0, forward, cam->position);
-			body->transform.scale = 0.2;
-			body->velocity = tin_scale_v3(5.0, forward);
-			objects[num_objects++] = (Object) {
-				body,
-				&cube_model,
-				{{ 0.5f, 0.5f, 1.0f }}
-			};
+			throwing = true;
+			latest_throw = -INFINITY;
+		} else {
+			throwing = false;
 		}
 		break;
 	}
@@ -329,6 +321,28 @@ main(void)
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
+
+		if (throwing) {
+			if (glfwGetTime() - latest_throw > 0.2) {
+				latest_throw = glfwGetTime();
+				if (num_objects >= MAX_OBJECTS) {
+					printf("Cannot spawn box: too many objects already present.\n");
+				} else {
+					Tin_Vec3 forward = {{ -cam->rotation[6], -cam->rotation[7], -cam->rotation[8] }};
+					Tin_Body *body = tin_add_body(&scene, &cube_shape, 1.0 / 1.0);
+					memcpy(body->transform.rotation, cam->rotation, sizeof cam->rotation);
+					body->transform.translation = tin_saxpy_v3(1.0, forward, cam->position);
+					body->transform.scale = 0.2;
+					body->velocity = tin_scale_v3(5.0, forward);
+					objects[num_objects++] = (Object) {
+						body,
+						&cube_model,
+						{{ 0.5f, 0.5f, 1.0f }}
+					};
+				}
+			}
+		}
+
 		Tin_Scalar dt = 1.0f / 60.0f * time_multiplier;
 
 		camera_update(&camera, 1.0f / 60.0f);
