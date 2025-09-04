@@ -31,8 +31,9 @@ Features
 Technology
 ==========
 
-Intersection tests are performed through the XenoCollide algorithm, aka Minkowski Portal Refinement.
-Collision points on the minkowski sum are found through a second MPR step.
-They are converted back into world space through a roundtrip over barycentric coordinates.
-Contact manifolds are cached across frames, and built up incrementally from the collision points found by MPR.
+Intersection tests between convex polytopes are performed through the XenoCollide algorithm, aka Minkowski Portal Refinement.
+The contact normal is found through iteration of the MPR algorithm.
+Antiparallel faces along the contact normal are chosen as contact features.
+Every frame, a new contact manifold is built through projection and Sutherland-Hogdman clipping of the contact features.
+Constraints are resolved by a sequential impulses solver.
 
