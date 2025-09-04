@@ -174,6 +174,15 @@ typedef struct {
 	Tin_Scalar tangentAccum;
 	Tin_Scalar bitangentAccum;
 	Tin_Scalar effectiveMass[3];
+
+	Tin_Vec3   normalAngularImpulse1;
+	Tin_Vec3   normalAngularImpulse2;
+
+	Tin_Vec3   tangentAngularImpulse1;
+	Tin_Vec3   tangentAngularImpulse2;
+
+	Tin_Vec3   bitangentAngularImpulse1;
+	Tin_Vec3   bitangentAngularImpulse2;
 } Tin_Contact;
 
 int tin_polytope_collide(
