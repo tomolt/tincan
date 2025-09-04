@@ -3,7 +3,14 @@
 libtincan.a
 demo.elf
 Makefile
+
 tags
-perf.data*
+
 *.core
+
+perf.data*
+
 *.gcda
+gmon.out
+
+cachegrind.out.*

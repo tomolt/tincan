@@ -610,6 +610,28 @@ tin_polytope_collide(
 }
 
 Tin_Scalar
+tin_dot_v12(Tin_Scalar a[12], Tin_Scalar b[12])
+{
+#if TIN_HAS_SSE2
+	float f[4];
+	__m128 x0, x1, x2;
+	x0 = _mm_mul_ps(_mm_loadu_ps(&a[0]), _mm_loadu_ps(&b[0]));
+	x1 = _mm_mul_ps(_mm_loadu_ps(&a[4]), _mm_loadu_ps(&b[4]));
+	x2 = _mm_mul_ps(_mm_loadu_ps(&a[8]), _mm_loadu_ps(&b[8]));
+	x0 = _mm_add_ps(x0, x1);
+	x0 = _mm_add_ps(x0, x2);
+	_mm_store_ps(f, x0);
+	return (f[0] + f[1]) + (f[2] + f[3]);
+#else
+	Tin_Scalar sum = 0.0;
+	for (int i = 0; i < 12; i++) {
+		sum += a[i] * b[i];
+	}
+	return sum;
+#endif
+}
+
+Tin_Scalar
 tin_dot_array(Tin_Scalar a[], Tin_Scalar b[], int length)
 {
 	Tin_Scalar sum = 0.0;
@@ -639,7 +661,7 @@ tin_effective_mass(const Tin_Body *body1, const Tin_Body *body2, Tin_Scalar jaco
 	invMassJacobian[10] = temp.c[1];
 	invMassJacobian[11] = temp.c[2];
 
-	Tin_Scalar effectiveMass = 1.0 / tin_dot_array(jacobian, invMassJacobian, 12);
+	Tin_Scalar effectiveMass = 1.0 / tin_dot_v12(jacobian, invMassJacobian);
 	return effectiveMass;
 }
 
@@ -652,33 +674,43 @@ tin_apply_impulse(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], Tin
 	body2->angularVelocity = tin_saxpy_v3(magnitude, tin_m3_times_v3(body2->invInertia, TIN_VEC3(jacobian[9], jacobian[10], jacobian[11])), body2->angularVelocity);
 }
 
-void
+Tin_Scalar
 tin_enforce_jacobian_fast(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12],
 	Tin_Vec3 angularImpulse1, Tin_Vec3 angularImpulse2,
 	Tin_Scalar effectiveMass, Tin_Scalar bias,
-	Tin_Scalar *magnitudeAccum, Tin_Scalar minMagnitude, Tin_Scalar maxMagnitude)
+	Tin_Scalar magnitudeAccum, Tin_Scalar minMagnitude, Tin_Scalar maxMagnitude)
 {
 	/* Solve for magnitude */
+	Tin_Scalar velocity[12];
+	velocity[ 0] = body1->velocity.c[0];
+	velocity[ 1] = body1->velocity.c[1];
+	velocity[ 2] = body1->velocity.c[2];
+	velocity[ 3] = body1->angularVelocity.c[0];
+	velocity[ 4] = body1->angularVelocity.c[1];
+	velocity[ 5] = body1->angularVelocity.c[2];
+	velocity[ 6] = body2->velocity.c[0];
+	velocity[ 7] = body2->velocity.c[1];
+	velocity[ 8] = body2->velocity.c[2];
+	velocity[ 9] = body2->angularVelocity.c[0];
+	velocity[10] = body2->angularVelocity.c[1];
+	velocity[11] = body2->angularVelocity.c[2];
 	Tin_Scalar magnitude = bias;
-	magnitude -= tin_dot_array(jacobian + 0, body1->velocity.c, 3);
-	magnitude -= tin_dot_array(jacobian + 3, body1->angularVelocity.c, 3);
-	magnitude -= tin_dot_array(jacobian + 6, body2->velocity.c, 3);
-	magnitude -= tin_dot_array(jacobian + 9, body2->angularVelocity.c, 3);
+	magnitude -= tin_dot_v12(jacobian, velocity);
 	magnitude *= effectiveMass;
 
 	/* Clamp magnitude to fulfill inequality */
-	if (magnitudeAccum != NULL) {
-		Tin_Scalar prevAccum = *magnitudeAccum;
-		*magnitudeAccum += magnitude;
-		*magnitudeAccum = MAX(*magnitudeAccum, minMagnitude);
-		*magnitudeAccum = MIN(*magnitudeAccum, maxMagnitude);
-		magnitude = *magnitudeAccum - prevAccum;
-	}
+	Tin_Scalar prevAccum = magnitudeAccum;
+	magnitudeAccum += magnitude;
+	magnitudeAccum = MAX(magnitudeAccum, minMagnitude);
+	magnitudeAccum = MIN(magnitudeAccum, maxMagnitude);
+	magnitude = magnitudeAccum - prevAccum;
 
 	body1->velocity = tin_saxpy_v3(magnitude * body1->invMass, TIN_VEC3(jacobian[0], jacobian[1], jacobian[2]), body1->velocity);
 	body1->angularVelocity = tin_saxpy_v3(magnitude, angularImpulse1, body1->angularVelocity);
 	body2->velocity = tin_saxpy_v3(magnitude * body2->invMass, TIN_VEC3(jacobian[6], jacobian[7], jacobian[8]), body2->velocity);
 	body2->angularVelocity = tin_saxpy_v3(magnitude, angularImpulse2, body2->angularVelocity);
+
+	return magnitudeAccum;
 }
 
 void
@@ -798,7 +830,7 @@ tin_arbiter_apply_separation(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		Tin_Contact *contact = &arbiter->contacts[idx];
 		if (contact->separation >= 0.0) continue;
 
-		tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, contact->jacobian, contact->normalAngularImpulse1, contact->normalAngularImpulse2, contact->effectiveMass[0], contact->bias, &contact->ineqAccum, 0.0, INFINITY);
+		contact->ineqAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, contact->jacobian, contact->normalAngularImpulse1, contact->normalAngularImpulse2, contact->effectiveMass[0], contact->bias, contact->ineqAccum, 0.0, INFINITY);
 	}
 }
 
@@ -817,19 +849,19 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		Tin_Scalar jacobian[12];
 
 		tin_jacobian_along_axis(jacobian, arbiter->frictionDir, contact->posFrom1, contact->posFrom2);
-		tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, jacobian, contact->tangentAngularImpulse1, contact->tangentAngularImpulse2, contact->effectiveMass[1],
-			0.0f, &contact->tangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
+		contact->tangentAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, jacobian, contact->tangentAngularImpulse1, contact->tangentAngularImpulse2, contact->effectiveMass[1],
+			0.0, contact->tangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 
 		tin_jacobian_along_axis(jacobian, arbiter->orthoDir, contact->posFrom1, contact->posFrom2);
-		tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, jacobian, contact->bitangentAngularImpulse1, contact->bitangentAngularImpulse2, contact->effectiveMass[2],
-			0.0f, &contact->bitangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
+		contact->bitangentAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, jacobian, contact->bitangentAngularImpulse1, contact->bitangentAngularImpulse2, contact->effectiveMass[2],
+			0.0, contact->bitangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 	}
 }
 
 void
 tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 {
-	const Tin_Scalar biasFactor = 0.1f;
+	const Tin_Scalar biasFactor = 0.1;
 
 	Tin_Scalar bias;
 	Tin_Scalar separation;
@@ -848,19 +880,19 @@ tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt)
 	bias = -biasFactor * invDt * separation;
 	tin_jacobian_along_axis(jacobian, (Tin_Vec3){{1.0f, 0.0f, 0.0f}}, r1, r2);
 	effectiveMass = tin_effective_mass(joint->body1, joint->body2, jacobian);
-	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, effectiveMass, bias, NULL, 0.0f, 0.0f);
+	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, effectiveMass, bias, NULL, 0.0, 0.0);
 
 	separation = p2.c[1] - p1.c[1];
 	bias = -biasFactor * invDt * separation;
 	tin_jacobian_along_axis(jacobian, (Tin_Vec3){{0.0f, 1.0f, 0.0f}}, r1, r2);
 	effectiveMass = tin_effective_mass(joint->body1, joint->body2, jacobian);
-	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, effectiveMass, bias, NULL, 0.0f, 0.0f);
+	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, effectiveMass, bias, NULL, 0.0, 0.0);
 
 	separation = p2.c[2] - p1.c[2];
 	bias = -biasFactor * invDt * separation;
 	tin_jacobian_along_axis(jacobian, (Tin_Vec3){{0.0f, 0.0f, 1.0f}}, r1, r2);
 	effectiveMass = tin_effective_mass(joint->body1, joint->body2, jacobian);
-	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, effectiveMass, bias, NULL, 0.0f, 0.0f);
+	tin_enforce_jacobian(joint->body1, joint->body2, jacobian, effectiveMass, bias, NULL, 0.0, 0.0);
 }
 
 /* === Pair-Indexed Hashtable === :pair: */
