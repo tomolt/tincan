@@ -440,7 +440,7 @@ main(void)
 					Tin_Vec3 relVel = tin_sub_v3(arbiter->body1->velocity, arbiter->body2->velocity);
 
 					Tin_Vec3 frictionDir = tin_gram_schmidt(contact->normal, relVel);
-					if (tin_dot_v3(frictionDir, frictionDir) < 10000.0 * TIN_EPSILON) {
+					if (tin_dot_v3(frictionDir, frictionDir) < 0.001) {
 						frictionDir = tin_cross_v3(contact->normal, TIN_VEC3(1.0, 0.0, 0.0));
 						if (tin_dot_v3(frictionDir, frictionDir) == 0.0) {
 							frictionDir = tin_cross_v3(contact->normal, TIN_VEC3(0.0, 1.0, 0.0));

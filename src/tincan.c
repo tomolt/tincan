@@ -654,6 +654,10 @@ tin_enforce_jacobian(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12],
 	magnitude -= tin_dot_array(jacobian + 9, body2->angularVelocity.c, 3);
 	magnitude *= effectiveMass;
 
+	if (fabs(magnitude * body1->invMass) < 0.0001 && fabs(magnitude * body2->invMass) < 0.0001) {
+		return;
+	}
+
 	/* Clamp magnitude to fulfill inequality */
 	if (magnitudeAccum != NULL) {
 		Tin_Scalar prevAccum = *magnitudeAccum;
@@ -689,7 +693,7 @@ void
 tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
 	const Tin_Scalar allowedPenetration = 0.01;
-	const Tin_Scalar biasFactor = 0.3;
+	const Tin_Scalar biasFactor = 0.1;
 
 	for (int i = 0; i < arbiter->numContacts; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
@@ -742,7 +746,7 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	// TODO
 	(void)invDt;
 
-	const Tin_Scalar friction = 0.2;
+	const Tin_Scalar friction = 0.4;
 
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
@@ -763,10 +767,10 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		Tin_Vec3 relVel = tin_sub_v3(arbiter->body1->velocity, arbiter->body2->velocity);
 
 		Tin_Vec3 frictionDir = tin_gram_schmidt(contact->normal, relVel);
-		if (tin_dot_v3(frictionDir, frictionDir) < 10000.0 * TIN_EPSILON) {
-			frictionDir = tin_cross_v3(contact->normal, TIN_VEC3(1.0, 0.0, 0.0));
+		if (tin_dot_v3(frictionDir, frictionDir) < 0.001) {
+			frictionDir = tin_gram_schmidt(contact->normal, TIN_VEC3(1.0, 0.0, 0.0));
 			if (tin_dot_v3(frictionDir, frictionDir) == 0.0) {
-				frictionDir = tin_cross_v3(contact->normal, TIN_VEC3(0.0, 1.0, 0.0));
+				frictionDir = tin_gram_schmidt(contact->normal, TIN_VEC3(0.0, 1.0, 0.0));
 			}
 		}
 		frictionDir = tin_normalize_v3(frictionDir);
