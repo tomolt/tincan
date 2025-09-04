@@ -595,17 +595,11 @@ tin_polytope_collide(
 Tin_Scalar
 tin_dot_array(Tin_Scalar a[], Tin_Scalar b[], int length)
 {
-	Tin_Scalar sum = 0.0f;
+	Tin_Scalar sum = 0.0;
 	for (int i = 0; i < length; i++) {
 		sum += a[i] * b[i];
 	}
 	return sum;
-}
-
-Tin_Vec3
-tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec)
-{
-	return tin_m3_times_v3(body->invInertia, vec);
 }
 
 Tin_Scalar
@@ -616,19 +610,19 @@ tin_effective_mass(const Tin_Body *body1, const Tin_Body *body2, Tin_Scalar jaco
 	invMassJacobian[0] = body1->invMass * jacobian[0];
 	invMassJacobian[1] = body1->invMass * jacobian[1];
 	invMassJacobian[2] = body1->invMass * jacobian[2];
-	temp = tin_solve_inertia(body1, (Tin_Vec3){{ jacobian[3], jacobian[4], jacobian[5] }});
+	temp = tin_m3_times_v3(body1->invInertia, TIN_VEC3(jacobian[3], jacobian[4], jacobian[5]));
 	invMassJacobian[3] = temp.c[0];
 	invMassJacobian[4] = temp.c[1];
 	invMassJacobian[5] = temp.c[2];
 	invMassJacobian[6] = body2->invMass * jacobian[6];
 	invMassJacobian[7] = body2->invMass * jacobian[7];
 	invMassJacobian[8] = body2->invMass * jacobian[8];
-	temp = tin_solve_inertia(body2, (Tin_Vec3){{ jacobian[9], jacobian[10], jacobian[11] }});
+	temp = tin_m3_times_v3(body2->invInertia, TIN_VEC3(jacobian[9], jacobian[10], jacobian[11]));
 	invMassJacobian[9] = temp.c[0];
 	invMassJacobian[10] = temp.c[1];
 	invMassJacobian[11] = temp.c[2];
 
-	Tin_Scalar effectiveMass = 1.0f / tin_dot_array(jacobian, invMassJacobian, 12);
+	Tin_Scalar effectiveMass = 1.0 / tin_dot_array(jacobian, invMassJacobian, 12);
 	return effectiveMass;
 }
 
@@ -636,9 +630,9 @@ void
 tin_apply_impulse(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], Tin_Scalar magnitude)
 {
 	body1->velocity = tin_saxpy_v3(magnitude * body1->invMass, TIN_VEC3(jacobian[0], jacobian[1], jacobian[2]), body1->velocity);
-	body1->angularVelocity = tin_saxpy_v3(magnitude, tin_solve_inertia(body1, TIN_VEC3(jacobian[3], jacobian[4], jacobian[5])), body1->angularVelocity);
+	body1->angularVelocity = tin_saxpy_v3(magnitude, tin_m3_times_v3(body1->invInertia, TIN_VEC3(jacobian[3], jacobian[4], jacobian[5])), body1->angularVelocity);
 	body2->velocity = tin_saxpy_v3(magnitude * body2->invMass, TIN_VEC3(jacobian[6], jacobian[7], jacobian[8]), body2->velocity);
-	body2->angularVelocity = tin_saxpy_v3(magnitude, tin_solve_inertia(body2, TIN_VEC3(jacobian[9], jacobian[10], jacobian[11])), body2->angularVelocity);
+	body2->angularVelocity = tin_saxpy_v3(magnitude, tin_m3_times_v3(body2->invInertia, TIN_VEC3(jacobian[9], jacobian[10], jacobian[11])), body2->angularVelocity);
 }
 
 void

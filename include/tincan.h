@@ -193,8 +193,6 @@ typedef struct {
 	Tin_Contact contacts[TIN_MAX_CONTACTS];
 } Tin_Arbiter;
 
-Tin_Vec3 tin_solve_inertia(const Tin_Body *body, Tin_Vec3 vec);
-void tin_arbiter_add_contact(Tin_Arbiter *arbiter, Tin_Contact contact);
 void tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt);
 void tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt);
 
@@ -255,7 +253,6 @@ typedef struct Tin_Scene {
 } Tin_Scene;
 
 void tin_scene_update(Tin_Scene *scene);
-void tin_check_collision(Tin_Scene *scene, Tin_Body *body1, Tin_Body *body2);
 void tin_scene_prestep(Tin_Scene *scene, Tin_Arbiter *arbiters, size_t numArbiters, Tin_Scalar invDt);
 void tin_scene_step(Tin_Scene *scene, Tin_Arbiter *arbiters, size_t numArbiters, Tin_Scalar invDt);
 void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
