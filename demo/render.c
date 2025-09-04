@@ -70,7 +70,7 @@ static const char *model_frag_src =
 	"	float closestDepth = texture(shadowSampler, projPos.xy).r;\n"
 	"	float currentDepth = projPos.z;\n"
 	"	float cosAngle = max(dot(normal, -light_dir), 0.0);\n"
-	"	float bias = 0.001 * (1.0 - cosAngle) * (1.0 - cosAngle);\n"
+	"	float bias = 0.005 * (cosAngle) * (cosAngle);\n"
 	"	float contrib = 0.0;\n"
 	"	vec2 texelSize = 1.0 / textureSize(shadowSampler, 0);\n"
 	"	for (int y = -1; y <= 1; y++) {\n"
@@ -90,6 +90,26 @@ static const char *overlay_frag_src =
 	"void main() {\n"
 	"	frag_color = base_color;\n"
 	"}\n";
+
+static void
+uniform_v3(GLint location, Tin_Vec3 x)
+{
+	float f[3];
+	f[0] = x.c[0];
+	f[1] = x.c[1];
+	f[2] = x.c[2];
+	glUniform3fv(location, 1, f);
+}
+
+static void
+uniform_m4(GLint location, Mat4 x)
+{
+	float f[16];
+	for (int i = 0; i < 16; i++) {
+		f[i] = x.c[i];
+	}
+	glUniformMatrix4fv(location, 1, GL_FALSE, f);
+}
 
 static GLuint
 shader_compile(const char *source, GLenum type)
@@ -168,6 +188,8 @@ render_init(void)
 {
 	init_progs();
 
+	GLenum scalarGlType = sizeof(Tin_Scalar) < 8 ? GL_FLOAT : GL_DOUBLE;
+
 	/* model */
 
 	glGenBuffers(1, &model_vbo);
@@ -183,7 +205,7 @@ render_init(void)
 	glGenVertexArrays(1, &model_vao);
 	glBindVertexArray(model_vao);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 0, (void *) 0);
+	glVertexAttribPointer(0, 3, scalarGlType, GL_TRUE, 0, (void *) 0);
 
 	/* overlay */
 
@@ -193,7 +215,7 @@ render_init(void)
 	glGenVertexArrays(1, &overlay_vao);
 	glBindVertexArray(overlay_vao);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 0, (void *) 0);
+	glVertexAttribPointer(0, 3, scalarGlType, GL_TRUE, 0, (void *) 0);
 
 	/* shadow mapping */
 
@@ -290,17 +312,17 @@ render_start_scene_pass(int width, int height)
 	glClearColor(0.7, 0.9, 0.1, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glUniform3fv(model_uniforms[4], 1, render_light_dir.c);
+	uniform_v3(model_uniforms[4], render_light_dir);
 }
 
 void
 render_draw_model(const Model *model, const Tin_Transform *transform, Tin_Vec3 color)
 {
 	Mat4 model_matrix = mat4_from_transform(transform);
-	glUniformMatrix4fv(model_uniforms[0], 1, GL_FALSE, model_matrix.c);
-	glUniformMatrix4fv(model_uniforms[1], 1, GL_FALSE, render_view_matrix.c);
-	glUniformMatrix4fv(model_uniforms[2], 1, GL_FALSE, render_proj_matrix.c);
-	glUniformMatrix4fv(model_uniforms[3], 1, GL_FALSE, render_light_matrix.c);
+	uniform_m4(model_uniforms[0], model_matrix);
+	uniform_m4(model_uniforms[1], render_view_matrix);
+	uniform_m4(model_uniforms[2], render_proj_matrix);
+	uniform_m4(model_uniforms[3], render_light_matrix);
 	glUniform4f(model_uniforms[5], color.c[0], color.c[1], color.c[2], 1.0f);
 
 	glDrawElementsBaseVertex(GL_TRIANGLES, model->index_count,
@@ -334,9 +356,9 @@ render_push_vertex(Tin_Vec3 v)
 void
 render_draw_lines(Tin_Vec3 color)
 {
-	glUniformMatrix4fv(overlay_uniforms[0], 1, GL_FALSE, mat4_identity.c);
-	glUniformMatrix4fv(overlay_uniforms[1], 1, GL_FALSE, render_view_matrix.c);
-	glUniformMatrix4fv(overlay_uniforms[2], 1, GL_FALSE, render_proj_matrix.c);
+	uniform_m4(overlay_uniforms[0], mat4_identity);
+	uniform_m4(overlay_uniforms[1], render_view_matrix);
+	uniform_m4(overlay_uniforms[2], render_proj_matrix);
 	glUniform4f(overlay_uniforms[3], color.c[0], color.c[1], color.c[2], 1.0f);
 	glDrawArrays(GL_LINES, overlay_vbo_start, overlay_vbo_count);
 	overlay_vbo_start += overlay_vbo_count;
@@ -346,9 +368,9 @@ render_draw_lines(Tin_Vec3 color)
 void
 render_draw_triangle_strip(Tin_Vec3 color)
 {
-	glUniformMatrix4fv(overlay_uniforms[0], 1, GL_FALSE, mat4_identity.c);
-	glUniformMatrix4fv(overlay_uniforms[1], 1, GL_FALSE, render_view_matrix.c);
-	glUniformMatrix4fv(overlay_uniforms[2], 1, GL_FALSE, render_proj_matrix.c);
+	uniform_m4(overlay_uniforms[0], mat4_identity);
+	uniform_m4(overlay_uniforms[1], render_view_matrix);
+	uniform_m4(overlay_uniforms[2], render_proj_matrix);
 	glUniform4f(overlay_uniforms[3], color.c[0], color.c[1], color.c[2], 1.0f);
 	glDrawArrays(GL_TRIANGLE_STRIP, overlay_vbo_start, overlay_vbo_count);
 	overlay_vbo_start += overlay_vbo_count;

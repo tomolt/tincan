@@ -389,12 +389,76 @@ main(void)
 				Tin_Arbiter *arbiter = payload;
 				for (int c = 0; c < arbiter->numContacts; c++) {
 					Tin_Contact *contact = &arbiter->contacts[c];
+					if (contact->separation > 0.0) continue;
 					render_push_vertex(tin_fwtrf_point(&arbiter->body1->transform, contact->rel1));
 					render_push_vertex(tin_fwtrf_point(&arbiter->body2->transform, contact->rel2));
 				}
 			}
 		}
 		render_draw_lines(TIN_VEC3(1.0, 0.0, 0.0));
+
+		render_start_overlay();
+		for (int o1 = 0; o1 < num_objects; o1++) {
+			for (int o2 = o1+1; o2 < num_objects; o2++) {
+				void *payload;
+				if (!tin_find_pair(&scene.arbiters, (uintptr_t)objects[o1].body, (uintptr_t)objects[o2].body, &payload)) {
+					continue;
+				}
+				Tin_Arbiter *arbiter = payload;
+				for (int c = 0; c < arbiter->numContacts; c++) {
+					Tin_Contact *contact = &arbiter->contacts[c];
+					if (!(contact->separation > 0.0)) continue;
+					render_push_vertex(tin_fwtrf_point(&arbiter->body1->transform, contact->rel1));
+					render_push_vertex(tin_fwtrf_point(&arbiter->body2->transform, contact->rel2));
+				}
+			}
+		}
+		render_draw_lines(TIN_VEC3(0.0, 1.0, 0.0));
+
+		render_start_overlay();
+		for (int o1 = 0; o1 < num_objects; o1++) {
+			for (int o2 = o1+1; o2 < num_objects; o2++) {
+				void *payload;
+				if (!tin_find_pair(&scene.arbiters, (uintptr_t)objects[o1].body, (uintptr_t)objects[o2].body, &payload)) {
+					continue;
+				}
+				Tin_Arbiter *arbiter = payload;
+				for (int c = 0; c < arbiter->numContacts; c++) {
+					Tin_Contact *contact = &arbiter->contacts[c];
+					if (contact->separation > 0.0) continue;
+
+					const Tin_Scalar friction = 0.2;
+
+					Tin_Vec3 r1 = tin_fwtrf_dir(&arbiter->body1->transform,
+							tin_scale_v3(arbiter->body1->transform.scale, contact->rel1));
+					Tin_Vec3 r2 = tin_fwtrf_dir(&arbiter->body2->transform,
+							tin_scale_v3(arbiter->body2->transform.scale, contact->rel2));
+
+					//Tin_Vec3 relVel1 = tin_add_v3(arbiter->body1->velocity, tin_cross_v3(arbiter->body1->angularVelocity, r1));
+					//Tin_Vec3 relVel2 = tin_add_v3(arbiter->body2->velocity, tin_cross_v3(arbiter->body2->angularVelocity, r2));
+					//Tin_Vec3 relVel = tin_sub_v3(relVel1, relVel2);
+					Tin_Vec3 relVel = tin_sub_v3(arbiter->body1->velocity, arbiter->body2->velocity);
+
+					Tin_Vec3 frictionDir = tin_gram_schmidt(contact->normal, relVel);
+					if (tin_dot_v3(frictionDir, frictionDir) < 10000.0 * TIN_EPSILON) {
+						frictionDir = tin_cross_v3(contact->normal, TIN_VEC3(1.0, 0.0, 0.0));
+						if (tin_dot_v3(frictionDir, frictionDir) == 0.0) {
+							frictionDir = tin_cross_v3(contact->normal, TIN_VEC3(0.0, 1.0, 0.0));
+						}
+					}
+					frictionDir = tin_normalize_v3(frictionDir);
+
+					Tin_Vec3 orthoDir = tin_cross_v3(contact->normal, frictionDir);
+
+					Tin_Vec3 position = tin_scale_v3(0.5, tin_add_v3(tin_add_v3(arbiter->body1->transform.translation, r1), tin_add_v3(arbiter->body2->transform.translation, r2)));
+					render_push_vertex(position);
+					render_push_vertex(tin_saxpy_v3(10.0 * contact->ineqAccum * friction, frictionDir, position));
+					render_push_vertex(position);
+					render_push_vertex(tin_saxpy_v3(10.0 * contact->ineqAccum * friction, orthoDir, position));
+				}
+			}
+		}
+		render_draw_lines(TIN_VEC3(0.5, 0.5, 0.5));
 
 		render_proj_matrix = mat4_orthographic(0, width, 0, height, -1.0, 1.0);
 		render_view_matrix = mat4_from_transform(&ident);

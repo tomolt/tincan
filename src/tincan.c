@@ -559,7 +559,7 @@ tin_polytope_collide(
 		pointsA[countA++] = tin_fwtrf_point(ta, pa->vertices[idx]);
 	}
 
-	Tin_Vec3 refNormal = tin_fwtrf_dir(ta, pa->faceNormals[faceA]);
+	Tin_Vec3 refNormal = tin_normalize_v3(tin_fwtrf_dir(ta, pa->faceNormals[faceA]));
 	Tin_Scalar refBase = tin_dot_v3(refNormal, pointsA[0]);
 
 	int faceB = tin_incident_face(pb, tin_bwtrf_dir(tb, tin_neg_v3(refNormal)));
@@ -688,8 +688,8 @@ tin_jacobian_along_axis(Tin_Scalar jacobian[12], Tin_Vec3 axis, Tin_Vec3 r1, Tin
 void
 tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
-	const Tin_Scalar allowedPenetration = 0.005;
-	const Tin_Scalar biasFactor = 0.1;
+	const Tin_Scalar allowedPenetration = 0.01;
+	const Tin_Scalar biasFactor = 0.3;
 
 	for (int i = 0; i < arbiter->numContacts; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
@@ -703,10 +703,11 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 		tin_jacobian_along_axis(contact->jacobian, contact->normal, r1, r2);
 		contact->effectiveMass[0] = tin_effective_mass(arbiter->body1, arbiter->body2, contact->jacobian);
 
-		contact->bias = -biasFactor * invDt * MIN(0.0f, contact->separation + allowedPenetration) / arbiter->numContacts;
+		contact->bias = -biasFactor * invDt * MIN(0.0, contact->separation + allowedPenetration);
 
-		contact->ineqAccum = 0.0f;
-		contact->tangentAccum = 0.0f;
+		contact->ineqAccum = 0.0;
+		contact->tangentAccum = 0.0;
+		contact->bitangentAccum = 0.0;
 	}
 }
 
@@ -715,7 +716,7 @@ tin_arbiter_warm_start(Tin_Arbiter *arbiter)
 {
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
-		if (contact->separation >= 0.0f) continue;
+		if (contact->separation >= 0.0) continue;
 
 		tin_apply_impulse(arbiter->body1, arbiter->body2, contact->jacobian, contact->ineqAccum);
 	}
@@ -729,9 +730,9 @@ tin_arbiter_apply_separation(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
-		if (contact->separation >= 0.0f) continue;
+		if (contact->separation >= 0.0) continue;
 
-		tin_enforce_jacobian(arbiter->body1, arbiter->body2, contact->jacobian, contact->effectiveMass[0], contact->bias, &contact->ineqAccum, 0.0f, INFINITY);
+		tin_enforce_jacobian(arbiter->body1, arbiter->body2, contact->jacobian, contact->effectiveMass[0], contact->bias, &contact->ineqAccum, 0.0, INFINITY);
 	}
 }
 
@@ -741,27 +742,47 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	// TODO
 	(void)invDt;
 
-	const Tin_Scalar friction = 0.8f;
+	const Tin_Scalar friction = 0.2;
 
 	for (int idx = 0; idx < arbiter->numContacts; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
-		if (contact->separation >= 0.0f) continue;
+		if (contact->separation >= 0.0) continue;
 
 		Tin_Vec3 r1 = tin_fwtrf_dir(&arbiter->body1->transform,
 			tin_scale_v3(arbiter->body1->transform.scale, contact->rel1));
 		Tin_Vec3 r2 = tin_fwtrf_dir(&arbiter->body2->transform,
 			tin_scale_v3(arbiter->body2->transform.scale, contact->rel2));
 
-		Tin_Vec3 relVel1 = tin_add_v3(arbiter->body1->velocity, tin_cross_v3(arbiter->body1->angularVelocity, r1));
-		Tin_Vec3 relVel2 = tin_add_v3(arbiter->body2->velocity, tin_cross_v3(arbiter->body2->angularVelocity, r2));
-		Tin_Vec3 relVel = tin_sub_v3(relVel1, relVel2);
-		Tin_Vec3 frictionDir = tin_normalize_v3(relVel);
+		Tin_Vec3 midpoint = tin_scale_v3(0.5, tin_add_v3(tin_add_v3(arbiter->body1->transform.translation, r1), tin_add_v3(arbiter->body2->transform.translation, r2)));
+		r1 = tin_sub_v3(midpoint, arbiter->body1->transform.translation);
+		r2 = tin_sub_v3(midpoint, arbiter->body2->transform.translation);
+
+		//Tin_Vec3 relVel1 = tin_add_v3(arbiter->body1->velocity, tin_cross_v3(arbiter->body1->angularVelocity, r1));
+		//Tin_Vec3 relVel2 = tin_add_v3(arbiter->body2->velocity, tin_cross_v3(arbiter->body2->angularVelocity, r2));
+		//Tin_Vec3 relVel = tin_sub_v3(relVel1, relVel2);
+		Tin_Vec3 relVel = tin_sub_v3(arbiter->body1->velocity, arbiter->body2->velocity);
+
+		Tin_Vec3 frictionDir = tin_gram_schmidt(contact->normal, relVel);
+		if (tin_dot_v3(frictionDir, frictionDir) < 10000.0 * TIN_EPSILON) {
+			frictionDir = tin_cross_v3(contact->normal, TIN_VEC3(1.0, 0.0, 0.0));
+			if (tin_dot_v3(frictionDir, frictionDir) == 0.0) {
+				frictionDir = tin_cross_v3(contact->normal, TIN_VEC3(0.0, 1.0, 0.0));
+			}
+		}
+		frictionDir = tin_normalize_v3(frictionDir);
+
+		Tin_Vec3 orthoDir = tin_normalize_v3(tin_cross_v3(contact->normal, frictionDir));
 
 		Tin_Scalar jacobian[12];
-		tin_jacobian_along_axis(jacobian, frictionDir, r1, r2);
 		Tin_Scalar effectiveMass;
+
+		tin_jacobian_along_axis(jacobian, frictionDir, r1, r2);
 		effectiveMass = tin_effective_mass(arbiter->body1, arbiter->body2, jacobian);
 		tin_enforce_jacobian(arbiter->body1, arbiter->body2, jacobian, effectiveMass, 0.0f, &contact->tangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
+
+		tin_jacobian_along_axis(jacobian, orthoDir, r1, r2);
+		effectiveMass = tin_effective_mass(arbiter->body1, arbiter->body2, jacobian);
+		tin_enforce_jacobian(arbiter->body1, arbiter->body2, jacobian, effectiveMass, 0.0f, &contact->bitangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 	}
 }
 
@@ -1084,14 +1105,16 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 	TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
 		bool stable = true;
 
-		if (tin_dot_v3(body->velocity, body->velocity) > 10000.0f * TIN_EPSILON) {
+		if (tin_dot_v3(body->velocity, body->velocity) > 1000.0f * TIN_EPSILON) {
 			body->transform.translation = tin_saxpy_v3(dt, body->velocity, body->transform.translation);
 			stable = false;
+		} else {
+			body->velocity = TIN_VEC3(0, 0, 0);
 		}
 		
 		Tin_Scalar angle = sqrt(tin_dot_v3(body->angularVelocity, body->angularVelocity));
 		
-		if (fabs(angle) > 0.01) {
+		if (fabs(angle) > 0.02) {
 			Tin_Scalar change[3*3];
 			tin_axis_angle_to_matrix(tin_normalize_v3(body->angularVelocity), angle * dt, change);
 
@@ -1101,10 +1124,8 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 			tin_m3_times_m3(body->transform.rotation, change, copyOfRotation);
 
 			stable = false;
-		}
-
-		if (!tin_island_find(body)->islandStable) {
-			body->velocity = tin_saxpy_v3(dt, (Tin_Vec3) {{ 0.0f, -2.0f, 0.0f }}, body->velocity);
+		} else {
+			body->angularVelocity = TIN_VEC3(0, 0, 0);
 		}
 
 		if (stable) {
@@ -1172,13 +1193,24 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	size_t num_collisions;
 	Tin_Collision *collisions = tin_broadphase(scene, &num_collisions);
 	tin_build_islands(scene, collisions, num_collisions);
+	{
+		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+			if (!tin_island_find(body)->islandStable) {
+				body->velocity = tin_saxpy_v3(dt, TIN_VEC3(0.0, -9.0, 0.0), body->velocity);
+			}
+		}
+	}
 	size_t old_num_collisions = num_collisions;
 	num_collisions = 0;
 	for (size_t c = 0; c < old_num_collisions; c++) {
-		if (!tin_island_find(collisions[c].bodyA)->islandStable || !tin_island_find(collisions[c].bodyB)->islandStable) {
-			collisions[num_collisions++] = collisions[c];
+		if (collisions[c].bodyA->invMass == 0.0 || tin_island_find(collisions[c].bodyA)->islandStable) {
+			if (collisions[c].bodyB->invMass == 0.0 || tin_island_find(collisions[c].bodyB)->islandStable) {
+				continue;
+			}
 		}
+		collisions[num_collisions++] = collisions[c];
 	}
+	printf("#collisions = %zu\n", num_collisions);
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[1] += stopTime - startTime;
 
@@ -1193,7 +1225,7 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	if (timings) timings[3] += stopTime - startTime;
 
 	startTime = gettime ? gettime() : 0.0;
-	for (int iter = 0; iter < 8; iter++) {
+	for (int iter = 0; iter < 16; iter++) {
 		tin_scene_step(scene, collisions, num_collisions, invDt);
 	}
 	stopTime = gettime ? gettime() : 0.0;
