@@ -286,9 +286,7 @@ main(void)
 
 	TIN_LIST_INIT(scene.bodies);
 	TIN_LIST_INIT(scene.joints);
-	tin_create_pairtable(&scene.arbiters);
 	scene.bodyAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Body), custom_alloc, custom_free };
-	scene.arbiterAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Arbiter), custom_alloc, custom_free };
 	scene.jointAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Joint), custom_alloc, custom_free };
 
 	/*
@@ -379,6 +377,7 @@ main(void)
 		}
 		render_draw_lines(TIN_VEC3(0.0, 0.0, 1.0));
 
+#if 0
 		render_start_overlay();
 		for (int o1 = 0; o1 < num_objects; o1++) {
 			for (int o2 = o1+1; o2 < num_objects; o2++) {
@@ -459,6 +458,7 @@ main(void)
 			}
 		}
 		render_draw_lines(TIN_VEC3(0.5, 0.5, 0.5));
+#endif
 
 		render_proj_matrix = mat4_orthographic(0, width, 0, height, -1.0, 1.0);
 		render_view_matrix = mat4_from_transform(&ident);
