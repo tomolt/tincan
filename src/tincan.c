@@ -761,7 +761,7 @@ void
 tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 {
 	const Tin_Scalar allowedPenetration = 0.01;
-	const Tin_Scalar biasFactor = 0.05;
+	const Tin_Scalar biasFactor = 0.1;
 
 	Tin_Vec3 relVel = tin_sub_v3(arbiter->body1->velocity, arbiter->body2->velocity);
 	Tin_Vec3 frictionDir = tin_gram_schmidt(arbiter->normal, relVel);

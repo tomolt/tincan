@@ -70,17 +70,18 @@ static const char *model_frag_src =
 	"	float closestDepth = texture(shadowSampler, projPos.xy).r;\n"
 	"	float currentDepth = projPos.z;\n"
 	"	float cosAngle = max(dot(normal, -light_dir), 0.0);\n"
-	"	float bias = max(0.0005 * cosAngle, 0.00005);\n"
+	"	float bias = -max(0.01 * (1.0 - cosAngle), 0.0005);\n"
 	"	float contrib = 0.0;\n"
 	"	vec2 texelSize = 1.0 / textureSize(shadowSampler, 0);\n"
-	"	for (int y = -1; y <= 1; y++) {\n"
-	"		for (int x = -1; x <= 1; x++) {\n"
-	"			float pcfDepth = texture(shadowSampler, projPos.xy + vec2(x, y) * texelSize).r;\n"
-	"			contrib += pcfDepth > currentDepth + bias ? 1.0 : 0.0;\n"
-	"		}\n"
-	"	}\n"
-	"	contrib /= 9.0;\n"
-	"	frag_color = base_color * (0.8 * contrib * cosAngle + 0.2);\n"
+	"	vec2 texelPos = projPos.xy * textureSize(shadowSampler, 0);\n"
+	"	vec2 texelBlend = vec2(fract(texelPos.x), fract(texelPos.y));\n"
+	"	ivec2 texelIdx = ivec2(floor(texelPos.x), floor(texelPos.y));\n"
+	"	float shadowContrib00 = texelFetch(shadowSampler, texelIdx + ivec2(0,0), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
+	"	float shadowContrib10 = texelFetch(shadowSampler, texelIdx + ivec2(1,0), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
+	"	float shadowContrib01 = texelFetch(shadowSampler, texelIdx + ivec2(0,1), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
+	"	float shadowContrib11 = texelFetch(shadowSampler, texelIdx + ivec2(1,1), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
+	"	float shadowContrib = mix(mix(shadowContrib00, shadowContrib10, texelBlend.x), mix(shadowContrib01, shadowContrib11, texelBlend.x), texelBlend.y);\n"
+	"	frag_color = base_color * (0.8 * shadowContrib * cosAngle + 0.2);\n"
 	"}\n";
 
 static const char *overlay_frag_src =
@@ -285,7 +286,7 @@ render_start_shadow_pass(void)
 	glBindFramebuffer(GL_FRAMEBUFFER, shadow_fbo);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
-	glCullFace(GL_FRONT);
+	glCullFace(GL_BACK);
 
 	glUseProgram(shadow_prog);
 	glBindVertexArray(model_vao);
