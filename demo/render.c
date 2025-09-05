@@ -70,7 +70,7 @@ static const char *model_frag_src =
 	"	float closestDepth = texture(shadowSampler, projPos.xy).r;\n"
 	"	float currentDepth = projPos.z;\n"
 	"	float cosAngle = max(dot(normal, -light_dir), 0.0);\n"
-	"	float bias = 0.005 * (cosAngle) * (cosAngle);\n"
+	"	float bias = max(0.0005 * cosAngle, 0.00005);\n"
 	"	float contrib = 0.0;\n"
 	"	vec2 texelSize = 1.0 / textureSize(shadowSampler, 0);\n"
 	"	for (int y = -1; y <= 1; y++) {\n"
