@@ -8,12 +8,12 @@
 #include "mat4.h"
 #include "render.h"
 
-#define MODEL_VBO_CAPACITY   4096
-#define MODEL_IBO_CAPACITY   4096
+#define MODEL_VBO_CAPACITY   (16 * 1024)
+#define MODEL_IBO_CAPACITY   (16 * 1024)
 #define OVERLAY_VBO_CAPACITY (16 * 1024)
 
-#define SHADOW_WIDTH 2048
-#define SHADOW_HEIGHT 2048
+#define SHADOW_WIDTH 4096
+#define SHADOW_HEIGHT 4096
 
 static GLuint  model_prog;
 static GLuint  model_uniforms[6];
@@ -71,16 +71,20 @@ static const char *model_frag_src =
 	"	float currentDepth = projPos.z;\n"
 	"	float cosAngle = max(dot(normal, -light_dir), 0.0);\n"
 	"	float bias = -max(0.01 * (1.0 - cosAngle), 0.0005);\n"
-	"	float contrib = 0.0;\n"
 	"	vec2 texelSize = 1.0 / textureSize(shadowSampler, 0);\n"
-	"	vec2 texelPos = projPos.xy * textureSize(shadowSampler, 0);\n"
-	"	vec2 texelBlend = vec2(fract(texelPos.x), fract(texelPos.y));\n"
-	"	ivec2 texelIdx = ivec2(floor(texelPos.x), floor(texelPos.y));\n"
-	"	float shadowContrib00 = texelFetch(shadowSampler, texelIdx + ivec2(0,0), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
-	"	float shadowContrib10 = texelFetch(shadowSampler, texelIdx + ivec2(1,0), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
-	"	float shadowContrib01 = texelFetch(shadowSampler, texelIdx + ivec2(0,1), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
-	"	float shadowContrib11 = texelFetch(shadowSampler, texelIdx + ivec2(1,1), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
-	"	float shadowContrib = mix(mix(shadowContrib00, shadowContrib10, texelBlend.x), mix(shadowContrib01, shadowContrib11, texelBlend.x), texelBlend.y);\n"
+	"	const vec2 sampleOffsets[] = vec2[5](vec2(0.0,0.0), vec2(1.0,0.0), vec2(-1.0,0.0), vec2(0.0,1.0), vec2(0.0,-1.0));\n"
+	"	float shadowContrib = 0.0;\n"
+	"	for (int i = 0; i < 5; i++) {\n"
+	"		vec2 texelPos = projPos.xy * textureSize(shadowSampler, 0) + sampleOffsets[i];\n"
+	"		vec2 texelBlend = vec2(fract(texelPos.x), fract(texelPos.y));\n"
+	"		ivec2 texelIdx = ivec2(floor(texelPos.x), floor(texelPos.y));\n"
+	"		float shadowContrib00 = texelFetch(shadowSampler, texelIdx + ivec2(0,0), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
+	"		float shadowContrib10 = texelFetch(shadowSampler, texelIdx + ivec2(1,0), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
+	"		float shadowContrib01 = texelFetch(shadowSampler, texelIdx + ivec2(0,1), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
+	"		float shadowContrib11 = texelFetch(shadowSampler, texelIdx + ivec2(1,1), 0).r > currentDepth + bias ? 1.0 : 0.0;\n"
+	"		shadowContrib += mix(mix(shadowContrib00, shadowContrib10, texelBlend.x), mix(shadowContrib01, shadowContrib11, texelBlend.x), texelBlend.y);\n"
+	"	}\n"
+	"	shadowContrib *= 1.0 / 5.0;\n"
 	"	frag_color = base_color * (0.8 * shadowContrib * cosAngle + 0.2);\n"
 	"}\n";
 
@@ -223,7 +227,7 @@ render_init(void)
 	glGenTextures(1, &shadow_depth);
 	glBindTexture(GL_TEXTURE_2D, shadow_depth);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
-		     SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+		     SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
