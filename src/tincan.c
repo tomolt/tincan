@@ -609,6 +609,24 @@ tin_polytope_collide(
 		contact->separation = tin_dot_v3(refNormal, tin_sub_v3(p2, p1));
 	}
 
+	for (int n = count; n > 1; n--) {
+		for (int i = 0; i < n - 1; i++) {
+			if (arbiter->contacts[i].separation >= 0.0 && !(arbiter->contacts[i+1].separation >= 0.0)) {
+				Tin_Contact temp = arbiter->contacts[i];
+				arbiter->contacts[i] = arbiter->contacts[i+1];
+				arbiter->contacts[i+1] = temp;
+			}
+		}
+	}
+
+	int numPenetrating = 0;
+	for (int i = 0; i < count; i++) {
+		if (!(arbiter->contacts[i].separation >= 0.0)) {
+			numPenetrating++;
+		}
+	}
+	arbiter->numPenetrating = numPenetrating;
+
 	return count;
 }
 
@@ -819,9 +837,8 @@ tin_arbiter_warm_start(Tin_Arbiter *arbiter, const Tin_Arbiter *oldArbiter)
 	if (!(arbiter->face1 == oldArbiter->face1 && arbiter->face2 == oldArbiter->face2)) {
 		return;
 	}
-	for (int i = 0; i < arbiter->numContacts; i++) {
+	for (int i = 0; i < arbiter->numPenetrating; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
-		if (contact->separation >= 0.0) continue;
 
 		for (int j = 0; j < oldArbiter->numContacts; j++) {
 			const Tin_Contact *oldContact = &oldArbiter->contacts[j];
@@ -844,9 +861,8 @@ tin_arbiter_apply_separation(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	// TODO
 	(void)invDt;
 
-	for (int idx = 0; idx < arbiter->numContacts; idx++) {
+	for (int idx = 0; idx < arbiter->numPenetrating; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
-		if (contact->separation >= 0.0) continue;
 
 		contact->ineqAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, contact->jacobian, contact->normalAngularImpulse1, contact->normalAngularImpulse2, contact->effectiveMass[0], contact->bias, contact->ineqAccum, 0.0, INFINITY);
 	}
@@ -860,9 +876,8 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 
 	const Tin_Scalar friction = 0.4;
 
-	for (int idx = 0; idx < arbiter->numContacts; idx++) {
+	for (int idx = 0; idx < arbiter->numPenetrating; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
-		if (contact->separation >= 0.0) continue;
 
 		Tin_Scalar jacobian[12];
 

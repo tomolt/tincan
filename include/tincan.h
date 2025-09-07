@@ -211,6 +211,7 @@ typedef struct {
 	Tin_Vec3 frictionDir;
 	Tin_Vec3 orthoDir;
 	int numContacts;
+	int numPenetrating; // the penetrating contacts (separation < 0) come first
 	Tin_Contact contacts[TIN_MAX_CONTACTS];
 } Tin_Arbiter;
 
