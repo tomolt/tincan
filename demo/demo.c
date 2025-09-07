@@ -280,6 +280,7 @@ main(void)
 	TIN_LIST_INIT(scene.joints);
 	scene.bodyAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Body), custom_alloc, custom_free };
 	scene.jointAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Joint), custom_alloc, custom_free };
+	tin_create_pairtable(&scene.contactCache);
 
 	/*
 	Tin_Body *body1 = tin_add_body(&scene, &cone_shape, 1.0 / 1.0);

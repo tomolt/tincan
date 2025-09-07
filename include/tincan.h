@@ -161,6 +161,8 @@ void tin_refine_portal   (const void *geometry, Tin_SupportFunc support,
 
 /* === Contact Points === :contact: */
 
+#define TIN_MAX_CONTACTS 4
+
 typedef struct {
 	/* Vector from origin of body to the contact point on the body, in world-space. */
 	Tin_Vec3   posFrom1;
@@ -185,16 +187,26 @@ typedef struct {
 	Tin_Vec3   bitangentAngularImpulse2;
 } Tin_Contact;
 
-int tin_polytope_collide(
-	const Tin_Polytope *pa, const Tin_Transform *ta,
-	const Tin_Polytope *pb, const Tin_Transform *tb,
-	Tin_Contact *contacts, Tin_Vec3 *refNormalOut);
+/*
+typedef struct {
+	Tin_Vec3 posFrom1;
+	Tin_Vec3 posFrom2;
+	Tin_Scalar magnitudeAccums[3];
+} Tin_CachedContactPoint;
 
-#define TIN_MAX_CONTACTS 4
+typedef struct {
+	int face1;
+	int face2;
+	Tin_CachedContactPoint points[TIN_MAX_CONTACTS];
+	int numPoints;
+} Tin_CachedContact;
+*/
 
 typedef struct {
 	Tin_Body *body1;
 	Tin_Body *body2;
+	int face1;
+	int face2;
 	Tin_Vec3 normal;
 	Tin_Vec3 frictionDir;
 	Tin_Vec3 orthoDir;
@@ -250,7 +262,7 @@ typedef struct Tin_Scene Tin_Scene;
 
 Tin_Body *tin_island_find(Tin_Body *body);
 void tin_island_union(Tin_Body *body1, Tin_Body *body2);
-void tin_build_islands(Tin_Scene *scene, const Tin_Arbiter *arbiters, size_t numArbiters);
+void tin_build_islands(Tin_Scene *scene);
 
 /* === Scenes / Worlds === :scene: */
 
@@ -259,13 +271,20 @@ typedef struct Tin_Scene {
 	Tin_List joints;
 	Tin_Allocator bodyAllocator;
 	Tin_Allocator jointAllocator;
+	Tin_PairTable contactCache;
+	Tin_Arbiter *arbiters;
+	size_t numArbiters;
+	size_t capArbiters;
+	Tin_Arbiter *oldArbiters;
+	size_t numOldArbiters;
+	size_t capOldArbiters;
 } Tin_Scene;
 
 void tin_scene_update(Tin_Scene *scene);
-void tin_scene_prestep(Tin_Scene *scene, Tin_Arbiter *arbiters, size_t numArbiters, Tin_Scalar invDt);
-void tin_scene_step(Tin_Scene *scene, Tin_Arbiter *arbiters, size_t numArbiters, Tin_Scalar invDt);
+void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt);
+void tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt);
 void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
-Tin_Arbiter *tin_broadphase(Tin_Scene *scene, size_t *numArbitersOut);
+void tin_broadphase(Tin_Scene *scene);
 void tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6]);
 
 Tin_Body *tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass);

@@ -527,7 +527,7 @@ int
 tin_polytope_collide(
 	const Tin_Polytope *pa, const Tin_Transform *ta,
 	const Tin_Polytope *pb, const Tin_Transform *tb,
-	Tin_Contact *contacts, Tin_Vec3 *refNormalOut)
+	Tin_Arbiter *arbiter)
 {
 	Tin_Polysum ps = { pa, ta, pb, tb };
 
@@ -535,7 +535,7 @@ tin_polytope_collide(
 	r.origin = tin_sub_v3(ta->translation, tb->translation);
 	r.dir    = tin_neg_v3(r.origin);
 	Tin_Scalar norm = sqrt(tin_dot_v3(r.dir, r.dir));
-	if (norm == 0.0f) {
+	if (norm == 0.0) {
 		/* FIXME */
 		return 0;
 	}
@@ -547,14 +547,14 @@ tin_polytope_collide(
 	}
 	tin_refine_portal(&ps, tin_polysum_support, &r, &p);
 	p.normal = tin_normalize_v3(p.normal);
-	if (tin_dot_v3(p.normal, p.a) <= 0.0f) {
+	if (tin_dot_v3(p.normal, p.a) <= 0.0) {
 		return 0;
 	}
 
 	for (int it = 0; it < 4; it++) {
 		Tin_Ray nr;
 		nr.dir    = p.normal;
-		nr.origin = (Tin_Vec3) {{ 0.0f, 0.0f, 0.0f }};
+		nr.origin = TIN_VEC3(0.0, 0.0, 0.0);
 		Tin_Portal np;
 		if (!tin_construct_portal(&ps, tin_polysum_support, &nr, &np)) {
 			break;
@@ -565,7 +565,7 @@ tin_polytope_collide(
 		Tin_Scalar proj = tin_dot_v3(p.normal, np.normal);
 		p = np; /* lol */
 		r = nr;
-		if (proj >= 0.99f) break;
+		if (proj >= 0.99) break;
 	}
 
 	int faceA = tin_incident_face(pa, tin_bwtrf_dir(ta, p.normal));
@@ -594,16 +594,19 @@ tin_polytope_collide(
 		count = tin_reduce_manifold(manifold, count);
 	}
 
-	*refNormalOut = refNormal;
-	memset(contacts, 0, count * sizeof *contacts);
+	arbiter->normal = refNormal;
+	arbiter->face1 = faceA;
+	arbiter->face2 = faceB;
+	memset(arbiter->contacts, 0, count * sizeof *arbiter->contacts);
 	for (int i = 0; i < count; i++) {
+		Tin_Contact *contact = &arbiter->contacts[i];
 		Tin_Scalar projDist = tin_dot_v3(refNormal, manifold[i]) - refBase;
 		Tin_Vec3 projPoint = tin_saxpy_v3(-projDist, refNormal, manifold[i]);
-		contacts[i].posFrom1 = tin_sub_v3(projPoint, ta->translation);
-		contacts[i].posFrom2 = tin_sub_v3(manifold[i], tb->translation);
+		contact->posFrom1 = tin_sub_v3(projPoint, ta->translation);
+		contact->posFrom2 = tin_sub_v3(manifold[i], tb->translation);
 		Tin_Vec3 p1 = projPoint;
 		Tin_Vec3 p2 = manifold[i];
-		contacts[i].separation = tin_dot_v3(refNormal, tin_sub_v3(p2, p1));
+		contact->separation = tin_dot_v3(refNormal, tin_sub_v3(p2, p1));
 	}
 
 	return count;
@@ -810,13 +813,28 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 }
 
 void
-tin_arbiter_warm_start(Tin_Arbiter *arbiter)
+tin_arbiter_warm_start(Tin_Arbiter *arbiter, const Tin_Arbiter *oldArbiter)
 {
-	for (int idx = 0; idx < arbiter->numContacts; idx++) {
-		Tin_Contact *contact = &arbiter->contacts[idx];
+	const Tin_Scalar maxDistanceSq = 0.01;
+	if (!(arbiter->face1 == oldArbiter->face1 && arbiter->face2 == oldArbiter->face2)) {
+		return;
+	}
+	for (int i = 0; i < arbiter->numContacts; i++) {
+		Tin_Contact *contact = &arbiter->contacts[i];
 		if (contact->separation >= 0.0) continue;
 
-		tin_apply_impulse(arbiter->body1, arbiter->body2, contact->jacobian, contact->ineqAccum);
+		for (int j = 0; j < oldArbiter->numContacts; j++) {
+			const Tin_Contact *oldContact = &oldArbiter->contacts[j];
+			Tin_Vec3 diff1 = tin_sub_v3(contact->posFrom1, oldContact->posFrom1);
+			Tin_Vec3 diff2 = tin_sub_v3(contact->posFrom2, oldContact->posFrom2);
+			Tin_Scalar dist1Sq = tin_dot_v3(diff1, diff1);
+			Tin_Scalar dist2Sq = tin_dot_v3(diff2, diff2);
+			if (dist1Sq <= maxDistanceSq && dist2Sq <= maxDistanceSq) {
+				contact->ineqAccum = oldContact->ineqAccum;
+				tin_apply_impulse(arbiter->body1, arbiter->body2, contact->jacobian, contact->ineqAccum);
+				break;
+			}
+		}
 	}
 }
 
@@ -1072,7 +1090,7 @@ tin_island_union(Tin_Body *body1, Tin_Body *body2)
 }
 
 void
-tin_build_islands(Tin_Scene *scene, const Tin_Arbiter *arbiters, size_t numArbiters)
+tin_build_islands(Tin_Scene *scene)
 {
 	{
 		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
@@ -1081,9 +1099,10 @@ tin_build_islands(Tin_Scene *scene, const Tin_Arbiter *arbiters, size_t numArbit
 		}
 	}
 
-	for (size_t i = 0; i < numArbiters; i++) {
-		if (arbiters[i].body1->invMass != 0.0 && arbiters[i].body2->invMass != 0.0) {
-			tin_island_union(arbiters[i].body1, arbiters[i].body2);
+	for (size_t i = 0; i < scene->numArbiters; i++) {
+		Tin_Arbiter *arbiter = &scene->arbiters[i];
+		if (arbiter->body1->invMass != 0.0 && arbiter->body2->invMass != 0.0) {
+			tin_island_union(arbiter->body1, arbiter->body2);
 		}
 	}
 
@@ -1120,23 +1139,25 @@ tin_scene_update(Tin_Scene *scene)
 }
 
 void
-tin_scene_prestep(Tin_Scene *scene, Tin_Arbiter *arbiters, size_t numArbiters, Tin_Scalar invDt)
+tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt)
 {
-	(void)scene;
-	for (size_t i = 0; i < numArbiters; i++) {
-		tin_arbiter_prestep(&arbiters[i], invDt);
-		//tin_arbiter_warm_start(&arbiters[i]);
+	for (size_t i = 0; i < scene->numArbiters; i++) {
+		tin_arbiter_prestep(&scene->arbiters[i], invDt);
+		void *payload;
+		if (tin_find_pair(&scene->contactCache, (uintptr_t)scene->arbiters[i].body1, (uintptr_t)scene->arbiters[i].body2, &payload)) {
+			tin_arbiter_warm_start(&scene->arbiters[i], payload);
+		}
 	}
 }
 
 void
-tin_scene_step(Tin_Scene *scene, Tin_Arbiter *arbiters, size_t numArbiters, Tin_Scalar invDt)
+tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt)
 {
-	for (size_t i = 0; i < numArbiters; i++) {
-		tin_arbiter_apply_separation(&arbiters[i], invDt);
+	for (size_t i = 0; i < scene->numArbiters; i++) {
+		tin_arbiter_apply_separation(&scene->arbiters[i], invDt);
 	}
-	for (size_t i = 0; i < numArbiters; i++) {
-		tin_arbiter_apply_friction(&arbiters[i], invDt);
+	for (size_t i = 0; i < scene->numArbiters; i++) {
+		tin_arbiter_apply_friction(&scene->arbiters[i], invDt);
 	}
 	TIN_FOR_EACH(joint, scene->joints, Tin_Joint, node) {
 		tin_joint_apply_impulse(joint, invDt);
@@ -1182,11 +1203,11 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 	}
 }
 
-Tin_Arbiter *
-tin_broadphase(Tin_Scene *scene, size_t *numArbitersOut)
+void
+tin_broadphase(Tin_Scene *scene)
 {
-	size_t capac = 0, count = 0;
-	Tin_Arbiter *arbiters = NULL;
+	size_t capac = scene->capArbiters, count = 0;
+	Tin_Arbiter *arbiters = scene->arbiters;
 
 	TIN_FOR_EACH(body1, scene->bodies, Tin_Body, node) {
 		TIN_FOR_RANGE(body2, body1->node, scene->bodies, Tin_Body, node) {
@@ -1204,26 +1225,26 @@ tin_broadphase(Tin_Scene *scene, size_t *numArbitersOut)
 		}
 	}
 
-	*numArbitersOut = count;
-	return arbiters;
+	scene->arbiters = arbiters;
+	scene->numArbiters = count;
+	scene->capArbiters = capac;
 }
 
-size_t
-tin_narrowphase(Tin_Scene *scene, Tin_Arbiter *arbiters, size_t numArbiters)
+void
+tin_narrowphase(Tin_Scene *scene)
 {
-	(void)scene;
-	for (size_t i = 0; i < numArbiters; i++) {
-		arbiters[i].numContacts = tin_polytope_collide(
-				&arbiters[i].body1->shape->polytope, &arbiters[i].body1->transform,
-				&arbiters[i].body2->shape->polytope, &arbiters[i].body2->transform, arbiters[i].contacts, &arbiters[i].normal);
+	for (size_t i = 0; i < scene->numArbiters; i++) {
+		scene->arbiters[i].numContacts = tin_polytope_collide(
+				&scene->arbiters[i].body1->shape->polytope, &scene->arbiters[i].body1->transform,
+				&scene->arbiters[i].body2->shape->polytope, &scene->arbiters[i].body2->transform, &scene->arbiters[i]);
 	}
 	size_t numOut = 0;
-	for (size_t i = 0; i < numArbiters; i++) {
-		if (arbiters[i].numContacts > 0) {
-			arbiters[numOut++] = arbiters[i];
+	for (size_t i = 0; i < scene->numArbiters; i++) {
+		if (scene->arbiters[i].numContacts > 0) {
+			scene->arbiters[numOut++] = scene->arbiters[i];
 		}
 	}
-	return numOut;
+	scene->numArbiters = numOut;
 }
 
 void
@@ -1244,9 +1265,9 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	if (timings) timings[0] += stopTime - startTime;
 	
 	startTime = gettime ? gettime() : 0.0;
-	size_t numArbiters;
-	Tin_Arbiter *arbiters = tin_broadphase(scene, &numArbiters);
-	tin_build_islands(scene, arbiters, numArbiters);
+	tin_broadphase(scene);
+	tin_build_islands(scene);
+	/* Apply Gravity */
 	{
 		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
 			if (!tin_island_find(body)->islandStable) {
@@ -1254,39 +1275,69 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 			}
 		}
 	}
-	size_t oldNumArbiters = numArbiters;
-	numArbiters = 0;
+
+	/* Filter out collisions within stable islands */
+	size_t oldNumArbiters = scene->numArbiters;
+	scene->numArbiters = 0;
 	for (size_t i = 0; i < oldNumArbiters; i++) {
-		if (tin_island_find(arbiters[i].body1)->islandStable) {
-			if (tin_island_find(arbiters[i].body2)->islandStable) {
+		if (tin_island_find(scene->arbiters[i].body1)->islandStable) {
+			if (tin_island_find(scene->arbiters[i].body2)->islandStable) {
 				continue;
 			}
 		}
-		arbiters[numArbiters++] = arbiters[i];
+		scene->arbiters[scene->numArbiters++] = scene->arbiters[i];
 	}
-	printf("#collisions = %zu\n", numArbiters);
+	printf("#collisions = %zu\n", scene->numArbiters);
+	
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[1] += stopTime - startTime;
 
 	startTime = gettime ? gettime() : 0.0;
-	numArbiters = tin_narrowphase(scene, arbiters, numArbiters);
+	tin_narrowphase(scene);
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[2] += stopTime - startTime;
 	
 	startTime = gettime ? gettime() : 0.0;
-	tin_scene_prestep(scene, arbiters, numArbiters, invDt);
+	tin_scene_prestep(scene, invDt);
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[3] += stopTime - startTime;
 
 	startTime = gettime ? gettime() : 0.0;
 	for (int iter = 0; iter < 16; iter++) {
-		tin_scene_step(scene, arbiters, numArbiters, invDt);
+		tin_scene_step(scene, invDt);
 	}
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[4] += stopTime - startTime;
-	
+
 	startTime = gettime ? gettime() : 0.0;
-	free(arbiters);
+	// Cache this frames contacts for the next frame
+	/*
+	for (size_t i = 0; i < numArbiters; i++) {
+		Tin_CachedContact *cachedContact = calloc(1, sizeof *cachedContact);
+		cachedContact->face1 = arbiters[i].face1;
+		cachedContact->face2 = arbiters[i].face2;
+		cachedContact->numPoints = arbiters[i].numContacts;
+		for (int p = 0; p < arbiters[i].numContacts; p++) {
+			Tin_CachedContactPoint *cachedPoint = &cachedContact->points[p];
+			cachedPoint->posFrom1 = arbiters[i].contacts[p].posFrom1;
+			cachedPoint->posFrom2 = arbiters[i].contacts[p].posFrom2;
+			cachedPoint->magnitudeAccums[0] = arbiters[i].contacts[p].ineqAccum;
+			cachedPoint->magnitudeAccums[1] = arbiters[i].contacts[p].tangentAccum;
+			cachedPoint->magnitudeAccums[2] = arbiters[i].contacts[p].bitangentAccum;
+		}
+		tin_insert_pair(&scene->contactCache, (uintptr_t)arbiters[i].body1, (uintptr_t)arbiters[i].body2, cachedContact);
+	}
+	*/
+	scene->numOldArbiters = scene->numArbiters;
+	scene->capOldArbiters = scene->capArbiters;
+	scene->oldArbiters = realloc(scene->oldArbiters, scene->capOldArbiters * sizeof *scene->oldArbiters);
+	memcpy(scene->oldArbiters, scene->arbiters, scene->numOldArbiters * sizeof *scene->oldArbiters);
+	for (size_t i = 0; i < scene->numOldArbiters; i++) {
+		Tin_Arbiter *arbiter = &scene->oldArbiters[i];
+		tin_insert_pair(&scene->contactCache,
+			(uintptr_t)arbiter->body1, (uintptr_t)arbiter->body2,
+			arbiter);
+	}
 	tin_integrate(scene, dt);
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[5] += stopTime - startTime;
