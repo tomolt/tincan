@@ -726,10 +726,28 @@ tin_enforce_jacobian_fast(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[
 	magnitudeAccum = MIN(magnitudeAccum, maxMagnitude);
 	magnitude = magnitudeAccum - prevAccum;
 
+#if TIN_HAS_SSE2
+	__m128 vx = _mm_set_ps(body2->angularVelocity.c[0], body2->velocity.c[0], body1->angularVelocity.c[0], body1->velocity.c[0]);
+	__m128 vy = _mm_set_ps(body2->angularVelocity.c[1], body2->velocity.c[1], body1->angularVelocity.c[1], body1->velocity.c[1]);
+	__m128 vz = _mm_set_ps(body2->angularVelocity.c[2], body2->velocity.c[2], body1->angularVelocity.c[2], body1->velocity.c[2]);
+	__m128 factor = _mm_set1_ps(magnitude) * _mm_set_ps(1.0, body2->invMass, 1.0, body1->invMass);
+	vx = _mm_add_ps(vx, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[0], jacobian[6], angularImpulse1.c[0], jacobian[0])));
+	vy = _mm_add_ps(vy, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[1], jacobian[7], angularImpulse1.c[1], jacobian[1])));
+	vz = _mm_add_ps(vz, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[2], jacobian[8], angularImpulse1.c[2], jacobian[2])));
+	float f[12];
+	_mm_store_ps(&f[0], vx);
+	_mm_store_ps(&f[4], vy);
+	_mm_store_ps(&f[8], vz);
+	body1->velocity = TIN_VEC3(f[0], f[4], f[8]);
+	body1->angularVelocity = TIN_VEC3(f[1], f[5], f[9]);
+	body2->velocity = TIN_VEC3(f[2], f[6], f[10]);
+	body2->angularVelocity = TIN_VEC3(f[3], f[7], f[11]);
+#else
 	body1->velocity = tin_saxpy_v3(magnitude * body1->invMass, TIN_VEC3(jacobian[0], jacobian[1], jacobian[2]), body1->velocity);
 	body1->angularVelocity = tin_saxpy_v3(magnitude, angularImpulse1, body1->angularVelocity);
 	body2->velocity = tin_saxpy_v3(magnitude * body2->invMass, TIN_VEC3(jacobian[6], jacobian[7], jacobian[8]), body2->velocity);
 	body2->angularVelocity = tin_saxpy_v3(magnitude, angularImpulse2, body2->angularVelocity);
+#endif
 
 	return magnitudeAccum;
 }
@@ -807,22 +825,26 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 
 		contact->bias = -biasFactor * invDt * MIN(0.0, contact->separation + allowedPenetration);
 
-		Tin_Scalar jacobian[12];
-
-		tin_jacobian_along_axis(jacobian, frictionDir, contact->posFrom1, contact->posFrom2);
-		contact->effectiveMass[1] = tin_effective_mass(arbiter->body1, arbiter->body2, jacobian);
-		contact->tangentAngularImpulse1 = tin_m3_times_v3(arbiter->body1->invInertia, TIN_VEC3(jacobian[3], jacobian[4], jacobian[5]));
-		contact->tangentAngularImpulse2 = tin_m3_times_v3(arbiter->body2->invInertia, TIN_VEC3(jacobian[9], jacobian[10], jacobian[11]));
-
-
-		tin_jacobian_along_axis(jacobian, orthoDir, contact->posFrom1, contact->posFrom2);
-		contact->effectiveMass[2] = tin_effective_mass(arbiter->body1, arbiter->body2, jacobian);
-		contact->bitangentAngularImpulse1 = tin_m3_times_v3(arbiter->body1->invInertia, TIN_VEC3(jacobian[3], jacobian[4], jacobian[5]));
-		contact->bitangentAngularImpulse2 = tin_m3_times_v3(arbiter->body2->invInertia, TIN_VEC3(jacobian[9], jacobian[10], jacobian[11]));
+		tin_jacobian_along_axis(contact->tangentJacobian, frictionDir, contact->posFrom1, contact->posFrom2);
+		contact->effectiveMass[1] = tin_effective_mass(arbiter->body1, arbiter->body2, contact->tangentJacobian);
+		contact->tangentAngularImpulse1 = tin_m3_times_v3(arbiter->body1->invInertia,
+			TIN_VEC3(contact->tangentJacobian[3], contact->tangentJacobian[4], contact->tangentJacobian[5]));
+		contact->tangentAngularImpulse2 = tin_m3_times_v3(arbiter->body2->invInertia,
+			TIN_VEC3(contact->tangentJacobian[9], contact->tangentJacobian[10], contact->tangentJacobian[11]));
 
 
-		contact->normalAngularImpulse1 = tin_m3_times_v3(arbiter->body1->invInertia, TIN_VEC3(contact->jacobian[3], contact->jacobian[4], contact->jacobian[5]));
-		contact->normalAngularImpulse2 = tin_m3_times_v3(arbiter->body2->invInertia, TIN_VEC3(contact->jacobian[9], contact->jacobian[10], contact->jacobian[11]));
+		tin_jacobian_along_axis(contact->bitangentJacobian, orthoDir, contact->posFrom1, contact->posFrom2);
+		contact->effectiveMass[2] = tin_effective_mass(arbiter->body1, arbiter->body2, contact->bitangentJacobian);
+		contact->bitangentAngularImpulse1 = tin_m3_times_v3(arbiter->body1->invInertia,
+			TIN_VEC3(contact->bitangentJacobian[3], contact->bitangentJacobian[4], contact->bitangentJacobian[5]));
+		contact->bitangentAngularImpulse2 = tin_m3_times_v3(arbiter->body2->invInertia,
+			TIN_VEC3(contact->bitangentJacobian[9], contact->bitangentJacobian[10], contact->bitangentJacobian[11]));
+
+
+		contact->normalAngularImpulse1 = tin_m3_times_v3(arbiter->body1->invInertia,
+			TIN_VEC3(contact->jacobian[3], contact->jacobian[4], contact->jacobian[5]));
+		contact->normalAngularImpulse2 = tin_m3_times_v3(arbiter->body2->invInertia,
+			TIN_VEC3(contact->jacobian[9], contact->jacobian[10], contact->jacobian[11]));
 
 		contact->ineqAccum = 0.0;
 		contact->tangentAccum = 0.0;
@@ -848,7 +870,11 @@ tin_arbiter_warm_start(Tin_Arbiter *arbiter, const Tin_Arbiter *oldArbiter)
 			Tin_Scalar dist2Sq = tin_dot_v3(diff2, diff2);
 			if (dist1Sq <= maxDistanceSq && dist2Sq <= maxDistanceSq) {
 				contact->ineqAccum = oldContact->ineqAccum;
+				contact->tangentAccum = oldContact->tangentAccum;
+				contact->bitangentAccum = oldContact->bitangentAccum;
 				tin_apply_impulse(arbiter->body1, arbiter->body2, contact->jacobian, contact->ineqAccum);
+				tin_apply_impulse(arbiter->body1, arbiter->body2, contact->tangentJacobian, contact->tangentAccum);
+				tin_apply_impulse(arbiter->body1, arbiter->body2, contact->bitangentJacobian, contact->bitangentAccum);
 				break;
 			}
 		}
@@ -879,14 +905,10 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	for (int idx = 0; idx < arbiter->numPenetrating; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
 
-		Tin_Scalar jacobian[12];
-
-		tin_jacobian_along_axis(jacobian, arbiter->frictionDir, contact->posFrom1, contact->posFrom2);
-		contact->tangentAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, jacobian, contact->tangentAngularImpulse1, contact->tangentAngularImpulse2, contact->effectiveMass[1],
+		contact->tangentAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, contact->tangentJacobian, contact->tangentAngularImpulse1, contact->tangentAngularImpulse2, contact->effectiveMass[1],
 			0.0, contact->tangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 
-		tin_jacobian_along_axis(jacobian, arbiter->orthoDir, contact->posFrom1, contact->posFrom2);
-		contact->bitangentAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, jacobian, contact->bitangentAngularImpulse1, contact->bitangentAngularImpulse2, contact->effectiveMass[2],
+		contact->bitangentAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, contact->bitangentJacobian, contact->bitangentAngularImpulse1, contact->bitangentAngularImpulse2, contact->effectiveMass[2],
 			0.0, contact->bitangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 	}
 }
