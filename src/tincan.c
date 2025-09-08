@@ -15,11 +15,13 @@
 #ifdef _MSC_VER // compiling with MSVC
 #	if defined(_M_AMD64) || defined(_M_X64) || _M_IX86_FP == 2
 #		define TIN_HAS_SSE2 1
+#		include <stdalign.h>
 #		include <intrin.h>
 #	endif
 #else // any other compiler; Assume compatibility with GCC
 #	if defined(__SSE2__)
 #		define TIN_HAS_SSE2 1
+#		include <stdalign.h>
 #		include <emmintrin.h>
 #	endif
 #endif
@@ -702,23 +704,28 @@ tin_enforce_jacobian_fast(Tin_Scalar (*velocities)[6], int body1Idx, int body2Id
 	Tin_Scalar effectiveMass, Tin_Scalar bias,
 	Tin_Scalar magnitudeAccum, Tin_Scalar minMagnitude, Tin_Scalar maxMagnitude)
 {
+#if TIN_HAS_SSE2 // and Tin_Scalar == float ...
+	/* Prepare 12D velocity vector for SIMD operations */
+	__m128 vel1XY = _mm_loadu_ps(&velocities[body1Idx][0]);
+	__m128 vel1Z  = _mm_loadu_ps(&velocities[body1Idx][4]);
+	__m128 vel2XY = _mm_loadu_ps(&velocities[body2Idx][0]);
+	__m128 vel2Z  = _mm_loadu_ps(&velocities[body2Idx][4]);
+	__m128 velX   = _mm_unpacklo_ps(vel1XY, vel2XY); // V1X V2X W1X W2X
+	__m128 velY   = _mm_unpackhi_ps(vel1XY, vel2XY); // V1Y V2Y W1Y W2Y
+	__m128 velZ   = _mm_unpacklo_ps(vel1Z,  vel2Z);  // V1Z V2Z W1Z W2Z
+
 	/* Solve for magnitude */
-	Tin_Scalar velocity[12];
-	velocity[ 0] = velocities[body1Idx][0];
-	velocity[ 1] = velocities[body2Idx][0];
-	velocity[ 2] = velocities[body1Idx][1];
-	velocity[ 3] = velocities[body2Idx][1];
-	velocity[ 4] = velocities[body1Idx][2];
-	velocity[ 5] = velocities[body2Idx][2];
-	velocity[ 6] = velocities[body1Idx][3];
-	velocity[ 7] = velocities[body2Idx][3];
-	velocity[ 8] = velocities[body1Idx][4];
-	velocity[ 9] = velocities[body2Idx][4];
-	velocity[10] = velocities[body1Idx][5];
-	velocity[11] = velocities[body2Idx][5];
-	Tin_Scalar magnitude = bias;
-	magnitude -= tin_dot_v12(jacobian, velocity);
-	magnitude *= effectiveMass;
+	__m128 jacobianX = _mm_loadu_ps(&jacobian[0]);
+	__m128 jacobianY = _mm_loadu_ps(&jacobian[4]);
+	__m128 jacobianZ = _mm_loadu_ps(&jacobian[8]);
+	__m128 dotX = _mm_mul_ps(jacobianX, velX);
+	__m128 dotY = _mm_mul_ps(jacobianY, velY);
+	__m128 dotZ = _mm_mul_ps(jacobianZ, velZ);
+	__m128 dot4 = _mm_add_ps(_mm_add_ps(dotX, dotY), dotZ);
+	alignas(16) float dotF[4];
+	_mm_store_ps(dotF, dot4);
+	float dot = (dotF[0] + dotF[1]) + (dotF[2] + dotF[3]);
+	Tin_Scalar magnitude = (bias - dot) * effectiveMass;
 
 	/* Clamp magnitude to fulfill inequality */
 	Tin_Scalar prevAccum = magnitudeAccum;
@@ -727,30 +734,23 @@ tin_enforce_jacobian_fast(Tin_Scalar (*velocities)[6], int body1Idx, int body2Id
 	magnitudeAccum = MIN(magnitudeAccum, maxMagnitude);
 	magnitude = magnitudeAccum - prevAccum;
 
-#if TIN_HAS_SSE2
-	__m128 vx = _mm_set_ps(velocities[body2Idx][1], velocities[body2Idx][0], velocities[body1Idx][1], velocities[body1Idx][0]);
-	__m128 vy = _mm_set_ps(velocities[body2Idx][3], velocities[body2Idx][2], velocities[body1Idx][3], velocities[body1Idx][2]);
-	__m128 vz = _mm_set_ps(velocities[body2Idx][5], velocities[body2Idx][4], velocities[body1Idx][5], velocities[body1Idx][4]);
-	__m128 factor = _mm_set1_ps(magnitude) * _mm_set_ps(1.0, body2InvMass, 1.0, body1InvMass);
-	vx = _mm_add_ps(vx, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[0], jacobian[1], angularImpulse1.c[0], jacobian[0])));
-	vy = _mm_add_ps(vy, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[1], jacobian[5], angularImpulse1.c[1], jacobian[4])));
-	vz = _mm_add_ps(vz, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[2], jacobian[9], angularImpulse1.c[2], jacobian[8])));
-	float f[12];
-	_mm_store_ps(&f[0], vx);
-	_mm_store_ps(&f[4], vy);
-	_mm_store_ps(&f[8], vz);
-	velocities[body1Idx][0] = f[0];
-	velocities[body1Idx][1] = f[1];
-	velocities[body2Idx][0] = f[2];
-	velocities[body2Idx][1] = f[3];
-	velocities[body1Idx][2] = f[4];
-	velocities[body1Idx][3] = f[5];
-	velocities[body2Idx][2] = f[6];
-	velocities[body2Idx][3] = f[7];
-	velocities[body1Idx][4] = f[8];
-	velocities[body1Idx][5] = f[9];
-	velocities[body2Idx][4] = f[10];
-	velocities[body2Idx][5] = f[11];
+	/* Apply impulse */
+	__m128 factor = _mm_set1_ps(magnitude) * _mm_set_ps(1.0, 1.0, body2InvMass, body1InvMass);
+	velX = _mm_add_ps(velX, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[0], angularImpulse1.c[0], jacobian[1], jacobian[0])));
+	velY = _mm_add_ps(velY, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[1], angularImpulse1.c[1], jacobian[5], jacobian[4])));
+	velZ = _mm_add_ps(velZ, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[2], angularImpulse1.c[2], jacobian[9], jacobian[8])));
+
+	/* Deinterleave velocities again */
+	vel1XY = _mm_shuffle_ps(velX, velY,  _MM_SHUFFLE(2, 0, 2, 0));
+	vel1Z  = _mm_shuffle_ps(velZ, vel1Z, _MM_SHUFFLE(3, 2, 2, 0));
+	vel2XY = _mm_shuffle_ps(velX, velY,  _MM_SHUFFLE(3, 1, 3, 1));
+	vel2Z  = _mm_shuffle_ps(velZ, vel2Z, _MM_SHUFFLE(3, 2, 3, 1));
+
+	/* Write back changed velocities */
+	_mm_storeu_ps(&velocities[body1Idx][0], vel1XY);
+	_mm_storeu_ps(&velocities[body1Idx][4], vel1Z);
+	_mm_storeu_ps(&velocities[body2Idx][0], vel2XY);
+	_mm_storeu_ps(&velocities[body2Idx][4], vel2Z);
 #else
 	// TODO Non-SIMD tin_enforce_jacobian_fast()
 #error "Non-SIMD tin_enforce_jacobian_fast() is not implemented yet"
