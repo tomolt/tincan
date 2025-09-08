@@ -207,6 +207,10 @@ typedef struct {
 typedef struct {
 	Tin_Body *body1;
 	Tin_Body *body2;
+	int body1Idx;
+	int body2Idx;
+	Tin_Scalar body1InvMass;
+	Tin_Scalar body2InvMass;
 	int face1;
 	int face2;
 	Tin_Vec3 normal;
@@ -217,8 +221,7 @@ typedef struct {
 	Tin_Contact contacts[TIN_MAX_CONTACTS];
 } Tin_Arbiter;
 
-void tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt);
-void tin_arbiter_apply_impulse(Tin_Arbiter *arbiter, Tin_Scalar invDt);
+void tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
 
 typedef struct {
 	Tin_List node;
@@ -284,8 +287,8 @@ typedef struct Tin_Scene {
 } Tin_Scene;
 
 void tin_scene_update(Tin_Scene *scene);
-void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt);
-void tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt);
+void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
+void tin_scene_step(Tin_Scene *scene, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
 void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
 void tin_broadphase(Tin_Scene *scene);
 void tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6]);

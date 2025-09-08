@@ -696,25 +696,25 @@ tin_apply_impulse(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12], Tin
 }
 
 Tin_Scalar
-tin_enforce_jacobian_fast(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[12],
+tin_enforce_jacobian_fast(Tin_Scalar (*velocities)[6], int body1Idx, int body2Idx, Tin_Scalar body1InvMass, Tin_Scalar body2InvMass, Tin_Scalar jacobian[12],
 	Tin_Vec3 angularImpulse1, Tin_Vec3 angularImpulse2,
 	Tin_Scalar effectiveMass, Tin_Scalar bias,
 	Tin_Scalar magnitudeAccum, Tin_Scalar minMagnitude, Tin_Scalar maxMagnitude)
 {
 	/* Solve for magnitude */
 	Tin_Scalar velocity[12];
-	velocity[ 0] = body1->velocity.c[0];
-	velocity[ 1] = body1->velocity.c[1];
-	velocity[ 2] = body1->velocity.c[2];
-	velocity[ 3] = body1->angularVelocity.c[0];
-	velocity[ 4] = body1->angularVelocity.c[1];
-	velocity[ 5] = body1->angularVelocity.c[2];
-	velocity[ 6] = body2->velocity.c[0];
-	velocity[ 7] = body2->velocity.c[1];
-	velocity[ 8] = body2->velocity.c[2];
-	velocity[ 9] = body2->angularVelocity.c[0];
-	velocity[10] = body2->angularVelocity.c[1];
-	velocity[11] = body2->angularVelocity.c[2];
+	velocity[ 0] = velocities[body1Idx][0];
+	velocity[ 1] = velocities[body1Idx][2];
+	velocity[ 2] = velocities[body1Idx][4];
+	velocity[ 3] = velocities[body1Idx][1];
+	velocity[ 4] = velocities[body1Idx][3];
+	velocity[ 5] = velocities[body1Idx][5];
+	velocity[ 6] = velocities[body2Idx][0];
+	velocity[ 7] = velocities[body2Idx][2];
+	velocity[ 8] = velocities[body2Idx][4];
+	velocity[ 9] = velocities[body2Idx][1];
+	velocity[10] = velocities[body2Idx][3];
+	velocity[11] = velocities[body2Idx][5];
 	Tin_Scalar magnitude = bias;
 	magnitude -= tin_dot_v12(jacobian, velocity);
 	magnitude *= effectiveMass;
@@ -727,10 +727,10 @@ tin_enforce_jacobian_fast(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[
 	magnitude = magnitudeAccum - prevAccum;
 
 #if TIN_HAS_SSE2
-	__m128 vx = _mm_set_ps(body2->angularVelocity.c[0], body2->velocity.c[0], body1->angularVelocity.c[0], body1->velocity.c[0]);
-	__m128 vy = _mm_set_ps(body2->angularVelocity.c[1], body2->velocity.c[1], body1->angularVelocity.c[1], body1->velocity.c[1]);
-	__m128 vz = _mm_set_ps(body2->angularVelocity.c[2], body2->velocity.c[2], body1->angularVelocity.c[2], body1->velocity.c[2]);
-	__m128 factor = _mm_set1_ps(magnitude) * _mm_set_ps(1.0, body2->invMass, 1.0, body1->invMass);
+	__m128 vx = _mm_set_ps(velocities[body2Idx][1], velocities[body2Idx][0], velocities[body1Idx][1], velocities[body1Idx][0]);
+	__m128 vy = _mm_set_ps(velocities[body2Idx][3], velocities[body2Idx][2], velocities[body1Idx][3], velocities[body1Idx][2]);
+	__m128 vz = _mm_set_ps(velocities[body2Idx][5], velocities[body2Idx][4], velocities[body1Idx][5], velocities[body1Idx][4]);
+	__m128 factor = _mm_set1_ps(magnitude) * _mm_set_ps(1.0, body2InvMass, 1.0, body1InvMass);
 	vx = _mm_add_ps(vx, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[0], jacobian[6], angularImpulse1.c[0], jacobian[0])));
 	vy = _mm_add_ps(vy, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[1], jacobian[7], angularImpulse1.c[1], jacobian[1])));
 	vz = _mm_add_ps(vz, _mm_mul_ps(factor, _mm_set_ps(angularImpulse2.c[2], jacobian[8], angularImpulse1.c[2], jacobian[2])));
@@ -738,11 +738,20 @@ tin_enforce_jacobian_fast(Tin_Body *body1, Tin_Body *body2, Tin_Scalar jacobian[
 	_mm_store_ps(&f[0], vx);
 	_mm_store_ps(&f[4], vy);
 	_mm_store_ps(&f[8], vz);
-	body1->velocity = TIN_VEC3(f[0], f[4], f[8]);
-	body1->angularVelocity = TIN_VEC3(f[1], f[5], f[9]);
-	body2->velocity = TIN_VEC3(f[2], f[6], f[10]);
-	body2->angularVelocity = TIN_VEC3(f[3], f[7], f[11]);
+	velocities[body1Idx][0] = f[0];
+	velocities[body1Idx][1] = f[1];
+	velocities[body2Idx][0] = f[2];
+	velocities[body2Idx][1] = f[3];
+	velocities[body1Idx][2] = f[4];
+	velocities[body1Idx][3] = f[5];
+	velocities[body2Idx][2] = f[6];
+	velocities[body2Idx][3] = f[7];
+	velocities[body1Idx][4] = f[8];
+	velocities[body1Idx][5] = f[9];
+	velocities[body2Idx][4] = f[10];
+	velocities[body2Idx][5] = f[11];
 #else
+	// FIXME
 	body1->velocity = tin_saxpy_v3(magnitude * body1->invMass, TIN_VEC3(jacobian[0], jacobian[1], jacobian[2]), body1->velocity);
 	body1->angularVelocity = tin_saxpy_v3(magnitude, angularImpulse1, body1->angularVelocity);
 	body2->velocity = tin_saxpy_v3(magnitude * body2->invMass, TIN_VEC3(jacobian[6], jacobian[7], jacobian[8]), body2->velocity);
@@ -797,12 +806,14 @@ tin_jacobian_along_axis(Tin_Scalar jacobian[12], Tin_Vec3 axis, Tin_Vec3 r1, Tin
 }
 
 void
-tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
+tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt)
 {
 	const Tin_Scalar allowedPenetration = 0.01;
 	const Tin_Scalar biasFactor = 0.1;
 
-	Tin_Vec3 relVel = tin_sub_v3(arbiter->body1->velocity, arbiter->body2->velocity);
+	Tin_Scalar *vel1 = velocities[arbiter->body1Idx];
+	Tin_Scalar *vel2 = velocities[arbiter->body2Idx];
+	Tin_Vec3 relVel = tin_sub_v3(TIN_VEC3(vel1[0], vel1[2], vel1[4]), TIN_VEC3(vel2[0], vel2[2], vel2[4]));
 	Tin_Vec3 frictionDir = tin_gram_schmidt(arbiter->normal, relVel);
 	if (tin_dot_v3(frictionDir, frictionDir) < 0.001) {
 		frictionDir = tin_gram_schmidt(arbiter->normal, TIN_VEC3(1.0, 0.0, 0.0));
@@ -815,6 +826,9 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 
 	arbiter->frictionDir = frictionDir;
 	arbiter->orthoDir = orthoDir;
+
+	arbiter->body1InvMass = arbiter->body1->invMass;
+	arbiter->body2InvMass = arbiter->body2->invMass;
 
 	for (int i = 0; i < arbiter->numContacts; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
@@ -882,7 +896,7 @@ tin_arbiter_warm_start(Tin_Arbiter *arbiter, const Tin_Arbiter *oldArbiter)
 }
 
 void
-tin_arbiter_apply_separation(Tin_Arbiter *arbiter, Tin_Scalar invDt)
+tin_arbiter_apply_separation(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt)
 {
 	// TODO
 	(void)invDt;
@@ -890,12 +904,12 @@ tin_arbiter_apply_separation(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	for (int idx = 0; idx < arbiter->numPenetrating; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
 
-		contact->ineqAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, contact->jacobian, contact->normalAngularImpulse1, contact->normalAngularImpulse2, contact->effectiveMass[0], contact->bias, contact->ineqAccum, 0.0, INFINITY);
+		contact->ineqAccum = tin_enforce_jacobian_fast(velocities, arbiter->body1Idx, arbiter->body2Idx, arbiter->body1InvMass, arbiter->body2InvMass, contact->jacobian, contact->normalAngularImpulse1, contact->normalAngularImpulse2, contact->effectiveMass[0], contact->bias, contact->ineqAccum, 0.0, INFINITY);
 	}
 }
 
 void
-tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
+tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt)
 {
 	// TODO
 	(void)invDt;
@@ -905,10 +919,10 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar invDt)
 	for (int idx = 0; idx < arbiter->numPenetrating; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
 
-		contact->tangentAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, contact->tangentJacobian, contact->tangentAngularImpulse1, contact->tangentAngularImpulse2, contact->effectiveMass[1],
+		contact->tangentAccum = tin_enforce_jacobian_fast(velocities, arbiter->body1Idx, arbiter->body2Idx, arbiter->body1InvMass, arbiter->body2InvMass, contact->tangentJacobian, contact->tangentAngularImpulse1, contact->tangentAngularImpulse2, contact->effectiveMass[1],
 			0.0, contact->tangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 
-		contact->bitangentAccum = tin_enforce_jacobian_fast(arbiter->body1, arbiter->body2, contact->bitangentJacobian, contact->bitangentAngularImpulse1, contact->bitangentAngularImpulse2, contact->effectiveMass[2],
+		contact->bitangentAccum = tin_enforce_jacobian_fast(velocities, arbiter->body1Idx, arbiter->body2Idx, arbiter->body1InvMass, arbiter->body2InvMass, contact->bitangentJacobian, contact->bitangentAngularImpulse1, contact->bitangentAngularImpulse2, contact->effectiveMass[2],
 			0.0, contact->bitangentAccum, -contact->ineqAccum * friction, contact->ineqAccum * friction);
 	}
 }
@@ -1176,29 +1190,33 @@ tin_scene_update(Tin_Scene *scene)
 }
 
 void
-tin_scene_prestep(Tin_Scene *scene, Tin_Scalar invDt)
+tin_scene_prestep(Tin_Scene *scene, Tin_Scalar (*velocities)[6], Tin_Scalar invDt)
 {
 	for (size_t i = 0; i < scene->numArbiters; i++) {
-		tin_arbiter_prestep(&scene->arbiters[i], invDt);
+		tin_arbiter_prestep(&scene->arbiters[i], velocities, invDt);
+#if 0
 		void *payload;
 		if (tin_find_pair(&scene->contactCache, (uintptr_t)scene->arbiters[i].body1, (uintptr_t)scene->arbiters[i].body2, &payload)) {
 			tin_arbiter_warm_start(&scene->arbiters[i], payload);
 		}
+#endif
 	}
 }
 
 void
-tin_scene_step(Tin_Scene *scene, Tin_Scalar invDt)
+tin_scene_step(Tin_Scene *scene, Tin_Scalar (*velocities)[6], Tin_Scalar invDt)
 {
 	for (size_t i = 0; i < scene->numArbiters; i++) {
-		tin_arbiter_apply_separation(&scene->arbiters[i], invDt);
+		tin_arbiter_apply_separation(&scene->arbiters[i], velocities, invDt);
 	}
 	for (size_t i = 0; i < scene->numArbiters; i++) {
-		tin_arbiter_apply_friction(&scene->arbiters[i], invDt);
+		tin_arbiter_apply_friction(&scene->arbiters[i], velocities, invDt);
 	}
+#if 0
 	TIN_FOR_EACH(joint, scene->joints, Tin_Joint, node) {
 		tin_joint_apply_impulse(joint, invDt);
 	}
+#endif
 }
 
 void
@@ -1246,7 +1264,9 @@ tin_broadphase(Tin_Scene *scene)
 	size_t capac = scene->capArbiters, count = 0;
 	Tin_Arbiter *arbiters = scene->arbiters;
 
+	int body1Idx = 0;
 	TIN_FOR_EACH(body1, scene->bodies, Tin_Body, node) {
+		int body2Idx = body1Idx + 1;
 		TIN_FOR_RANGE(body2, body1->node, scene->bodies, Tin_Body, node) {
 			Tin_Vec3 diff = tin_sub_v3(body2->transform.translation, body1->transform.translation);
 			Tin_Scalar radii =
@@ -1257,9 +1277,11 @@ tin_broadphase(Tin_Scene *scene)
 					capac = capac ? 2*capac : 16;
 					arbiters = realloc(arbiters, capac * sizeof *arbiters);
 				}
-				arbiters[count++] = (Tin_Arbiter){ .body1 = body1, .body2 = body2 };
+				arbiters[count++] = (Tin_Arbiter){ .body1 = body1, .body2 = body2, .body1Idx = body1Idx, .body2Idx = body2Idx };
 			}
+			body2Idx++;
 		}
+		body1Idx++;
 	}
 
 	scene->arbiters = arbiters;
@@ -1305,11 +1327,13 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	tin_broadphase(scene);
 	tin_build_islands(scene);
 	/* Apply Gravity */
+	size_t numBodies = 0;
 	{
 		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
 			if (!tin_island_find(body)->islandStable) {
 				body->velocity = tin_saxpy_v3(dt, TIN_VEC3(0.0, -9.0, 0.0), body->velocity);
 			}
+			numBodies++;
 		}
 	}
 
@@ -1325,7 +1349,7 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 		scene->arbiters[scene->numArbiters++] = scene->arbiters[i];
 	}
 	printf("#collisions = %zu\n", scene->numArbiters);
-	
+
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[1] += stopTime - startTime;
 
@@ -1334,17 +1358,45 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[2] += stopTime - startTime;
 	
+	Tin_Scalar (*velocities)[6] = malloc(numBodies * sizeof (Tin_Scalar[6]));
+	{
+		size_t b = 0;
+		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+			velocities[b][0] = body->velocity.c[0];
+			velocities[b][1] = body->angularVelocity.c[0];
+			velocities[b][2] = body->velocity.c[1];
+			velocities[b][3] = body->angularVelocity.c[1];
+			velocities[b][4] = body->velocity.c[2];
+			velocities[b][5] = body->angularVelocity.c[2];
+			b++;
+		}
+	}
+	
 	startTime = gettime ? gettime() : 0.0;
-	tin_scene_prestep(scene, invDt);
+	tin_scene_prestep(scene, velocities, invDt);
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[3] += stopTime - startTime;
 
 	startTime = gettime ? gettime() : 0.0;
 	for (int iter = 0; iter < 16; iter++) {
-		tin_scene_step(scene, invDt);
+		tin_scene_step(scene, velocities, invDt);
 	}
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[4] += stopTime - startTime;
+
+	{
+		size_t b = 0;
+		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+			body->velocity.c[0] = velocities[b][0];
+			body->angularVelocity.c[0] = velocities[b][1];
+			body->velocity.c[1] = velocities[b][2];
+			body->angularVelocity.c[1] = velocities[b][3];
+			body->velocity.c[2] = velocities[b][4];
+			body->angularVelocity.c[2] = velocities[b][5];
+			b++;
+		}
+	}
+	free(velocities);
 
 	startTime = gettime ? gettime() : 0.0;
 	// Cache this frames contacts for the next frame
