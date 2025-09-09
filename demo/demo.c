@@ -277,9 +277,7 @@ main(void)
 	camera.position.c[2] = 5.0f;
 
 	TIN_LIST_INIT(scene.bodies);
-	TIN_LIST_INIT(scene.joints);
 	scene.bodyAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Body), custom_alloc, custom_free };
-	scene.jointAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Joint), custom_alloc, custom_free };
 	tin_create_pairtable(&scene.contactCache);
 
 	/*
@@ -309,14 +307,6 @@ main(void)
 		&cube_model,
 		{{ 1.0f, 1.0f, 1.0f }}
 	};
-
-	/*
-	Tin_Joint *joint = tin_add_joint(&scene);
-	joint->body1 = body1;
-	joint->body2 = body2;
-	joint->relTo1 = (Tin_Vec3){{ 0.0f, -1.505f, 0.0f }};
-	joint->relTo2 = (Tin_Vec3){{ 0.0f, 1.005f, 0.0f }};
-	*/
 
 	double accumTimings[6];
 

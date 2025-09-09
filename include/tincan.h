@@ -156,7 +156,7 @@ typedef Tin_Vec3 Tin_SupportFunc(const void *, Tin_Vec3);
 
 int tin_construct_portal(const void *geometry, Tin_SupportFunc support,
 	const Tin_Ray *r, Tin_Portal *p);
-void tin_refine_portal   (const void *geometry, Tin_SupportFunc support,
+void tin_refine_portal  (const void *geometry, Tin_SupportFunc support,
 	const Tin_Ray *r, Tin_Portal *p);
 
 /* === Contact Points === :contact: */
@@ -164,29 +164,26 @@ void tin_refine_portal   (const void *geometry, Tin_SupportFunc support,
 #define TIN_MAX_CONTACTS 4
 
 typedef struct {
+	Tin_Scalar jacobian[12];
+	Tin_Vec3   angularImpulse1;
+	Tin_Vec3   angularImpulse2;
+	Tin_Scalar effectiveMass;
+	Tin_Scalar bias;
+	Tin_Scalar minMagnitude;
+	Tin_Scalar maxMagnitude;
+	Tin_Scalar accumMagnitude;
+} Tin_Constraint1D;
+
+typedef struct {
 	/* Vector from origin of body to the contact point on the body, in world-space. */
 	Tin_Vec3   posFrom1;
 	Tin_Vec3   posFrom2;
 
 	Tin_Scalar separation;
-	
-	Tin_Scalar jacobian[12];
-	Tin_Scalar tangentJacobian[12];
-	Tin_Scalar bitangentJacobian[12];
-	Tin_Scalar bias;
-	Tin_Scalar ineqAccum;
-	Tin_Scalar tangentAccum;
-	Tin_Scalar bitangentAccum;
-	Tin_Scalar effectiveMass[3];
 
-	Tin_Vec3   normalAngularImpulse1;
-	Tin_Vec3   normalAngularImpulse2;
-
-	Tin_Vec3   tangentAngularImpulse1;
-	Tin_Vec3   tangentAngularImpulse2;
-
-	Tin_Vec3   bitangentAngularImpulse1;
-	Tin_Vec3   bitangentAngularImpulse2;
+	Tin_Constraint1D normalConstraint;
+	Tin_Constraint1D tangentConstraint1;
+	Tin_Constraint1D tangentConstraint2;
 } Tin_Contact;
 
 /*
@@ -222,17 +219,6 @@ typedef struct {
 } Tin_Arbiter;
 
 void tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
-
-typedef struct {
-	Tin_List node;
-	Tin_Body *body1;
-	Tin_Body *body2;
-	Tin_Vec3 relTo1;
-	Tin_Vec3 relTo2;
-	Tin_Vec3 debugImpulse;
-} Tin_Joint;
-
-void tin_joint_apply_impulse(Tin_Joint *joint, Tin_Scalar invDt);
 
 /* === Pair-Indexed Hashtable === :pair: */
 
@@ -274,9 +260,7 @@ void tin_build_islands(Tin_Scene *scene);
 
 typedef struct Tin_Scene {
 	Tin_List bodies;
-	Tin_List joints;
 	Tin_Allocator bodyAllocator;
-	Tin_Allocator jointAllocator;
 	Tin_PairTable contactCache;
 	Tin_Arbiter *arbiters;
 	size_t numArbiters;
@@ -288,12 +272,11 @@ typedef struct Tin_Scene {
 
 void tin_scene_update(Tin_Scene *scene);
 void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
-void tin_scene_step(Tin_Scene *scene, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
+void tin_scene_step(Tin_Scene *scene, Tin_Scalar (*velocities)[6]);
 void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
 void tin_broadphase(Tin_Scene *scene);
 void tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6]);
 
 Tin_Body *tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass);
-Tin_Joint *tin_add_joint(Tin_Scene *scene);
 
 #endif
