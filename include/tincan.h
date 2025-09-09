@@ -116,17 +116,22 @@ void tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_
 typedef struct Tin_Body Tin_Body;
 struct Tin_Body {
 	Tin_List      node;
-	Tin_Transform transform;
+
 	const Tin_Shape *shape;
-	Tin_Scalar    invMass;
+	Tin_Transform transform;
+	
 	Tin_Vec3      velocity;
 	Tin_Vec3      angularVelocity;
+	
+	Tin_Scalar    invMass;
 	Tin_Scalar    invInertia[3*3];
-	Tin_Vec3      aabbMin;
-	Tin_Vec3      aabbMax;
+	
 	Tin_Body     *island;
 	int           restCounter;
 	bool          islandStable;
+	
+	Tin_Vec3      aabbMin;
+	Tin_Vec3      aabbMax;
 };
 
 /* === Minkowski Sum === :mink: */

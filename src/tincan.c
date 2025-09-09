@@ -666,7 +666,7 @@ tin_dot_array(Tin_Scalar a[], Tin_Scalar b[], int length)
 }
 
 void
-tin_apply_impulse(Tin_Constraint1D *constraint, Tin_Scalar velocity1[6], Tin_Scalar velocity2[6], Tin_Scalar body1InvMass, Tin_Scalar body2InvMass)
+tin_apply_impulse(Tin_Constraint1D *constraint, Tin_Scalar *velocity1, Tin_Scalar *velocity2, Tin_Scalar body1InvMass, Tin_Scalar body2InvMass)
 {
 #if TIN_HAS_SSE2 // and Tin_Scalar == float ...
 	/* Prepare 12D velocity vector for SIMD operations */
@@ -702,7 +702,7 @@ tin_apply_impulse(Tin_Constraint1D *constraint, Tin_Scalar velocity1[6], Tin_Sca
 }
 
 void
-tin_enforce_constraint_1d(Tin_Constraint1D *constraint, Tin_Scalar velocity1[6], Tin_Scalar velocity2[6], Tin_Scalar body1InvMass, Tin_Scalar body2InvMass)
+tin_enforce_constraint_1d(Tin_Constraint1D *constraint, Tin_Scalar *velocity1, Tin_Scalar *velocity2, Tin_Scalar body1InvMass, Tin_Scalar body2InvMass)
 {
 #if TIN_HAS_SSE2 // TODO and Tin_Scalar == float ...
 	/* Prepare 12D velocity vector for SIMD operations */
