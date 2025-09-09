@@ -170,8 +170,7 @@ void tin_refine_portal  (const void *geometry, Tin_SupportFunc support,
 
 typedef struct {
 	Tin_Scalar jacobian[12];
-	Tin_Vec3   angularImpulse1;
-	Tin_Vec3   angularImpulse2;
+	Tin_Scalar invMassJacobian[12];
 	Tin_Scalar effectiveMass;
 	Tin_Scalar bias;
 	Tin_Scalar minMagnitude;
@@ -211,8 +210,6 @@ typedef struct {
 	Tin_Body *body2;
 	int body1Idx;
 	int body2Idx;
-	Tin_Scalar body1InvMass;
-	Tin_Scalar body2InvMass;
 	int face1;
 	int face2;
 	Tin_Vec3 normal;
