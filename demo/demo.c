@@ -22,6 +22,7 @@ typedef struct {
 } Object;
 
 Tin_Scene scene;
+Tin_SweepPrune sweep_prune;
 
 static Camera camera;
 static Object objects[MAX_OBJECTS];
@@ -276,9 +277,12 @@ main(void)
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
 	camera.position.c[2] = 5.0f;
 
+	scene.numBodies = 0;
 	TIN_LIST_INIT(scene.bodies);
 	scene.bodyAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Body), custom_alloc, custom_free };
 	tin_create_pairtable(&scene.contactCache);
+	tin_create_sweep_prune(&sweep_prune, &scene);
+	scene.sweepPrune = &sweep_prune;
 
 	/*
 	Tin_Body *body1 = tin_add_body(&scene, &cone_shape, 1.0 / 1.0);

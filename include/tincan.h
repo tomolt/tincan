@@ -116,6 +116,7 @@ void tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_
 typedef struct Tin_Body Tin_Body;
 struct Tin_Body {
 	Tin_List      node;
+	int           bodyIdx;
 
 	const Tin_Shape *shape;
 	Tin_Transform transform;
@@ -260,8 +261,11 @@ void tin_build_islands(Tin_Scene *scene);
 
 /* === Scenes / Worlds === :scene: */
 
+typedef struct Tin_SweepPrune Tin_SweepPrune;
+
 typedef struct Tin_Scene {
 	Tin_List bodies;
+	size_t numBodies;
 	Tin_Allocator bodyAllocator;
 	Tin_PairTable contactCache;
 	Tin_Arbiter *arbiters;
@@ -270,6 +274,7 @@ typedef struct Tin_Scene {
 	Tin_Arbiter *oldArbiters;
 	size_t numOldArbiters;
 	size_t capOldArbiters;
+	Tin_SweepPrune *sweepPrune;
 } Tin_Scene;
 
 void tin_scene_update(Tin_Scene *scene);
@@ -295,7 +300,7 @@ typedef struct {
 	Tin_SweepEvent *events;
 } Tin_SweepAxis;
 
-typedef struct {
+typedef struct Tin_SweepPrune {
 	Tin_Scene *scene;
 	Tin_SweepAxis axes[3];
 } Tin_SweepPrune;

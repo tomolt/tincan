@@ -1272,7 +1272,25 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	if (timings) timings[0] += stopTime - startTime;
 	
 	startTime = gettime ? gettime() : 0.0;
-	tin_broadphase(scene);
+	tin_sweep_prune_update(scene->sweepPrune);
+	Tin_Body **broad;
+	size_t numBroad;
+	tin_sweep_prune(scene->sweepPrune, &broad, &numBroad);
+	scene->numArbiters = 0;
+	for (size_t i = 0; i < numBroad; i += 2) {
+		if (scene->numArbiters == scene->capArbiters) {
+			scene->capArbiters = scene->capArbiters ? 2*scene->capArbiters : 16;
+			scene->arbiters = realloc(scene->arbiters, scene->capArbiters * sizeof *scene->arbiters);
+		}
+		scene->arbiters[scene->numArbiters++] = (Tin_Arbiter){
+			.body1 = broad[i],
+			.body2 = broad[i+1],
+			.body1Idx = broad[i]->bodyIdx,
+			.body2Idx = broad[i+1]->bodyIdx,
+		};
+	}
+	free(broad);
+
 	tin_build_islands(scene);
 	/* Apply Gravity */
 	size_t numBodies = 0;
@@ -1387,6 +1405,7 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 {
 	Tin_Body *body = scene->bodyAllocator.alloc(scene->bodyAllocator.userPointer);
 	memset(body, 0, sizeof *body);
+	body->bodyIdx = scene->numBodies++;
 	body->transform = (Tin_Transform) {
 		{ 1, 0, 0, 0, 1, 0, 0, 0, 1 },
 		TIN_VEC3(0, 0, 0),
@@ -1396,6 +1415,7 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 	body->invMass = invMass;
 	TIN_LIST_LINK(*scene->bodies.prev, body->node);
 	TIN_LIST_LINK(body->node, scene->bodies);
+	tin_sweep_prune_add_body(scene->sweepPrune, body);
 	return body;
 }
 
@@ -1491,7 +1511,7 @@ tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const Tin_PairTable *filt
 					if (!capColliders) capColliders = 16;
 					colliders = realloc(colliders, capColliders * sizeof *colliders);
 				}
-				if (tin_find_pair(filter, (uintptr_t)active[a], (uintptr_t)event->body, NULL)) {
+				if (!filter || tin_find_pair(filter, (uintptr_t)active[a], (uintptr_t)event->body, NULL)) {
 					colliders[numColliders++] = active[a];
 					colliders[numColliders++] = event->body;
 				}
