@@ -976,8 +976,20 @@ tin_order_pair(size_t *elemLow, size_t *elemHigh)
 uint32_t
 tin_hash_pair(size_t elemLow, size_t elemHigh)
 {
-	// TODO better hash function
-	return ((elemLow ^ (elemHigh << 16)) * 33) >> 4;
+	union {
+		uint64_t q[2];
+		unsigned char b[16];
+	} u;
+	u.q[0] = elemLow;
+	u.q[1] = elemHigh;
+
+	/* FNV-1a hashing */
+	uint32_t hash = 2166136261u;
+	for (int i = 0; i < 16; i++) {
+		hash ^= u.b[i];
+		hash *= 16777619u;
+	}
+	return hash;
 }
 
 size_t
@@ -1026,7 +1038,7 @@ tin_find_pair(const Tin_PairTable *table, size_t elemA, size_t elemB, void **pay
 void
 tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload)
 {
-	if (3 * table->count >= 2 * table->capac) {
+	if (2 * table->count >= table->capac) {
 		tin_resize_pairtable(table, 2 * table->capac);
 	}
 	tin_order_pair(&elemA, &elemB);
