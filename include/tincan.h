@@ -288,6 +288,12 @@ Tin_Body *tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invM
 
 /* === Broadphase === :broad: */
 
+#define TIN_BLOOM_NUM_BITS (1024 * 8)
+
+void tin_bloom_hash(uintptr_t key1, uintptr_t key2, unsigned hashes[3]);
+void tin_bloom_insert(unsigned *bloom, uintptr_t key1, uintptr_t key2);
+bool tin_bloom_lookup(const unsigned *bloom, uintptr_t key1, uintptr_t key2);
+
 typedef struct {
 	Tin_Body *body;
 	Tin_Scalar value;
@@ -309,7 +315,7 @@ void tin_create_sweep_prune(Tin_SweepPrune *sap, Tin_Scene *scene);
 void tin_destroy_sweep_prune(Tin_SweepPrune *sap);
 void tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_Body *body);
 void tin_sweep_prune_update(Tin_SweepPrune *sap);
-void tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const Tin_PairTable *filter,
+void tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const unsigned *bloomFilter,
 	Tin_Body ***collidersOut, size_t *numCollidersOut);
 void tin_sweep_prune(Tin_SweepPrune *sap,
 	Tin_Body ***collidersOut, size_t *numCollidersOut);

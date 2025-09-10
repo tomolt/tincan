@@ -1434,6 +1434,82 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 /* === Broadphase === :broad: */
 
 void
+tin_bloom_hash(uintptr_t key1, uintptr_t key2, unsigned hashes[3])
+{
+	union {
+		uintptr_t k[2];
+		unsigned char b[sizeof(uintptr_t[2])];
+	} u;
+
+	if (key1 < key2) {
+		u.k[0] = key1;
+		u.k[1] = key2;
+	} else {
+		u.k[0] = key2;
+		u.k[1] = key1;
+	}
+
+	/* FNV-1a hash */
+	uint64_t hash = UINT64_C(14695981039346656037);
+	int i = 0;
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+	hash ^= u.b[i++];
+	hash *= UINT64_C(1099511628211);
+
+	hashes[0] = hash & 0x1FFFFF;
+	hashes[1] = (hash >> 21) & 0x1FFFFF;
+	hashes[2] = (hash >> 42) & 0x1FFFFF;
+}
+
+#define SET_BIT(u,i) ((u)[(i) / (8*sizeof*(u))] |= 1U << ((i) % (8*sizeof*(u))))
+#define GET_BIT(u,i) (((u)[(i) / (8*sizeof*(u))] >> ((i) % (8*sizeof*(u)))) & 1U)
+
+void
+tin_bloom_insert(unsigned *bloom, uintptr_t key1, uintptr_t key2)
+{
+	unsigned idx[3];
+	tin_bloom_hash(key1, key2, idx);
+	idx[0] %= TIN_BLOOM_NUM_BITS;
+	idx[1] %= TIN_BLOOM_NUM_BITS;
+	idx[2] %= TIN_BLOOM_NUM_BITS;
+	SET_BIT(bloom, idx[0]);
+	SET_BIT(bloom, idx[1]);
+	SET_BIT(bloom, idx[2]);
+}
+
+bool
+tin_bloom_lookup(const unsigned *bloom, uintptr_t key1, uintptr_t key2)
+{
+	unsigned idx[3];
+	tin_bloom_hash(key1, key2, idx);
+	idx[0] %= TIN_BLOOM_NUM_BITS;
+	idx[1] %= TIN_BLOOM_NUM_BITS;
+	idx[2] %= TIN_BLOOM_NUM_BITS;
+	return GET_BIT(bloom, idx[0]) & GET_BIT(bloom, idx[1]) & GET_BIT(bloom, idx[2]);
+}
+
+void
 tin_create_sweep_prune(Tin_SweepPrune *sap, Tin_Scene *scene)
 {
 	sap->scene = scene;
@@ -1502,7 +1578,7 @@ tin_sweep_prune_update(Tin_SweepPrune *sap)
 }
 
 void
-tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const Tin_PairTable *filter,
+tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const unsigned *bloomFilter,
 	Tin_Body ***collidersOut, size_t *numCollidersOut)
 {
 	const Tin_SweepAxis *axis = &sap->axes[axisIdx];
@@ -1523,7 +1599,7 @@ tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const Tin_PairTable *filt
 					if (!capColliders) capColliders = 16;
 					colliders = realloc(colliders, capColliders * sizeof *colliders);
 				}
-				if (!filter || tin_find_pair(filter, (uintptr_t)active[a], (uintptr_t)event->body, NULL)) {
+				if (!bloomFilter || tin_bloom_lookup(bloomFilter, (uintptr_t)active[a], (uintptr_t)event->body)) {
 					colliders[numColliders++] = active[a];
 					colliders[numColliders++] = event->body;
 				}
@@ -1553,25 +1629,23 @@ tin_sweep_prune(Tin_SweepPrune *sap,
 
 	tin_sweep_prune_axis(sap, 0, NULL, &colliders, &numColliders);
 
-	Tin_PairTable filter;
-	tin_create_pairtable(&filter);
-	
+	unsigned *bloomFilter = calloc(1, TIN_BLOOM_NUM_BITS / 8);
 	for (size_t i = 0; i < numColliders; i += 2) {
-		tin_insert_pair(&filter, (uintptr_t)colliders[i], (uintptr_t)colliders[i+1], NULL);
+		tin_bloom_insert(bloomFilter, (uintptr_t)colliders[i], (uintptr_t)colliders[i+1]);
 	}
 	free(colliders);
 
-	tin_sweep_prune_axis(sap, 1, &filter, &colliders, &numColliders);
+	tin_sweep_prune_axis(sap, 1, bloomFilter, &colliders, &numColliders);
 
-	tin_reset_pairtable(&filter);
+	memset(bloomFilter, 0, TIN_BLOOM_NUM_BITS / 8);
 	for (size_t i = 0; i < numColliders; i += 2) {
-		tin_insert_pair(&filter, (uintptr_t)colliders[i], (uintptr_t)colliders[i+1], NULL);
+		tin_bloom_insert(bloomFilter, (uintptr_t)colliders[i], (uintptr_t)colliders[i+1]);
 	}
 	free(colliders);
 
-	tin_sweep_prune_axis(sap, 2, &filter, &colliders, &numColliders);
+	tin_sweep_prune_axis(sap, 2, bloomFilter, &colliders, &numColliders);
 
-	tin_destroy_pairtable(&filter);
+	free(bloomFilter);
 
 	*collidersOut = colliders;
 	*numCollidersOut = numColliders;
