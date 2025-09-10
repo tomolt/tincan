@@ -989,7 +989,7 @@ tin_fold_hash(size_t capac, uint32_t hash)
 }
 
 size_t
-tin_pairtable_index(Tin_PairTable *table, size_t elemLow, size_t elemHigh)
+tin_pairtable_index(const Tin_PairTable *table, size_t elemLow, size_t elemHigh)
 {
 	uint32_t hash = tin_hash_pair(elemLow, elemHigh);
 	size_t index = tin_fold_hash(table->capac, hash);
@@ -1010,14 +1010,16 @@ tin_pairtable_index(Tin_PairTable *table, size_t elemLow, size_t elemHigh)
 }
 
 bool
-tin_find_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void **payloadOut)
+tin_find_pair(const Tin_PairTable *table, size_t elemA, size_t elemB, void **payloadOut)
 {
 	tin_order_pair(&elemA, &elemB);
 	size_t index = tin_pairtable_index(table, elemA, elemB);
 	if (!table->slots[index].occupied) {
 		return false;
 	}
-	*payloadOut = table->slots[index].payload;
+	if (payloadOut) {
+		*payloadOut = table->slots[index].payload;
+	}
 	return true;
 }
 
@@ -1399,107 +1401,146 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 
 /* === Broadphase === :broad: */
 
-#if 0
-struct Endpoint {
-	size_t bodyIdx;
-	Tin_Scalar value;
-	bool isMin;
-};
-
-struct Broadphase {
-	size_t numBodies;
-	struct Endpoint *axes[3];
-};
-
 void
-tin_create_broadphase(struct Broadphase *broad, size_t numBodies)
+tin_create_sweep_prune(Tin_SweepPrune *sap, Tin_Scene *scene)
 {
-	broad->numBodies = numBodies;
-	broad->touching = calloc(numBodies, sizeof *broad->touching);
-	broad->axes[0] = calloc(2 * numBodies, sizeof *broad->axes[0]);
-	broad->axes[1] = calloc(2 * numBodies, sizeof *broad->axes[0]);
-	broad->axes[2] = calloc(2 * numBodies, sizeof *broad->axes[0]);
+	sap->scene = scene;
+	for (int a = 0; a < 3; a++) {
+		sap->axes[a].numEvents = 0;
+		sap->axes[a].events = NULL;
+	}
 }
 
 void
-tin_destroy_broadphase(struct Broadphase *broad)
+tin_destroy_sweep_prune(Tin_SweepPrune *sap)
 {
-	for (size_t b = 0; b < broad->numBodies; b++) {
-		struct BodyList *list = broad->touching[b];
-		while (list) {
-			struct BodyList *next = list->next;
-			free(list);
-			list = next;
+	for (int a = 0; a < 3; a++) {
+		free(sap->axes[a].events);
+	}
+}
+
+void
+tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_Body *body)
+{
+	for (int a = 0; a < 3; a++) {
+		Tin_SweepAxis *axis = &sap->axes[a];
+		if (axis->numEvents + 2 > axis->capEvents) {
+			axis->capEvents *= 2;
+			if (!axis->capEvents) axis->capEvents = 16;
+			axis->events = realloc(axis->events, axis->capEvents * sizeof *axis->events);
+		}
+		axis->events[axis->numEvents++] = (Tin_SweepEvent){
+			.body  =  body,
+			.value = -INFINITY,
+			.isMin =  true
+		};
+		axis->events[axis->numEvents++] = (Tin_SweepEvent){
+			.body  =  body,
+			.value =  INFINITY,
+			.isMin =  false
+		};
+	}
+}
+
+void
+tin_sweep_prune_update(Tin_SweepPrune *sap)
+{
+	/* Update event positions (body extents) */
+	for (int a = 0; a < 3; a++) {
+		Tin_SweepAxis *axis = &sap->axes[a];
+		for (size_t e = 0; e < axis->numEvents; e++) {
+			Tin_SweepEvent *event = &axis->events[e];
+			Tin_Vec3 origin = event->body->transform.translation;
+			Tin_Scalar radius = event->body->shape->radius * event->body->transform.scale;
+			event->value = origin.c[a] + (event->isMin ? -radius : radius);
 		}
 	}
-	free(broad->touching);
-	free(broad->axes[0]);
-	free(broad->axes[1]);
-	free(broad->axes[2]);
-}
 
-void
-tin_update_broadphase(struct Broadphase *broad)
-{
-	(void) broad;
-	for () {
-		Tin_Body *body = tin_body_pointer(scene, index);
-	}
-}
-#endif
-
-#if 0
-void
-tin_sort_axis(struct Broadphase *broad, int axisNum)
-{
-	struct Endpoint *axis = broad->axes[axisNum];
-
-	for (size_t j, i = 1; i < 2 * broad->numBodies; i++) {
-		struct Endpoint point = axis[i];
-		for (j = i; j > 0 && axis[j-1].value > point.value; j--) {
-			axis[j] = axis[j-1];
+	/* Adapative, in-place event sorting (insertion sort) */
+	for (int a = 0; a < 3; a++) {
+		Tin_SweepAxis *axis = &sap->axes[a];
+		for (size_t j, i = 1; i < axis->numEvents; i++) {
+			Tin_SweepEvent temp = axis->events[i];
+			for (j = i; j > 0 && axis->events[j-1].value > temp.value; j--) {
+				axis->events[j] = axis->events[j-1];
+			}
+			axis->events[j] = temp;
 		}
-		axis[j] = point;
 	}
 }
 
 void
-tin_scan_axis(struct Broadphase *broad, int axisNum)
+tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const Tin_PairTable *filter,
+	Tin_Body ***collidersOut, size_t *numCollidersOut)
 {
-	struct Endpoint *axis = broad->axes[axisNum];
-	size_t numEndpoints = 2 * broad->numBodies;
+	const Tin_SweepAxis *axis = &sap->axes[axisIdx];
 
-	size_t *active = calloc(numEndpoints, sizeof *active);
+	Tin_Body **colliders = NULL;
+	size_t numColliders = 0;
+	size_t capColliders = 0;
+
+	Tin_Body **active = calloc(axis->numEvents / 2, sizeof *active);
 	size_t numActive = 0;
 
-	for (size_t i = 0; i < numEndpoints; i++) {
-		if (axis[i].isMin) {
+	for (size_t e = 0; e < axis->numEvents; e++) {
+		const Tin_SweepEvent *event = &axis->events[e];
+		if (event->isMin) {
 			for (size_t a = 0; a < numActive; a++) {
-				size_t body1 = active[a];
-				size_t body2 = axis[i].bodyIdx;
-
-				struct BodyList *listNodeA = calloc(1, sizeof *listNodeA);
-				listNodeA->bodyIdx = body2;
-				listNodeA->next = broad->touching[body1];
-				broad->touching[body1] = listNodeA;
-
-				struct BodyList *listNodeB = calloc(1, sizeof *listNodeB);
-				listNodeB->bodyIdx = body1;
-				listNodeB->next = broad->touching[body2];
-				broad->touching[body2] = listNodeB;
-			}
-			active[numActive++] = axis[i].bodyIdx;
-		} else {
-			for (size_t a = 0; a < numActive; a++) {
-				if (active[a] == axis[i].bodyIdx) {
-					active[a] = active[--numActive];
-					break;
+				if (numColliders + 2 > capColliders) {
+					capColliders *= 2;
+					if (!capColliders) capColliders = 16;
+					colliders = realloc(colliders, capColliders * sizeof *colliders);
+				}
+				if (tin_find_pair(filter, (uintptr_t)active[a], (uintptr_t)event->body, NULL)) {
+					colliders[numColliders++] = active[a];
+					colliders[numColliders++] = event->body;
 				}
 			}
+			active[numActive++] = event->body;
+		} else {
+			size_t a;
+			for (a = 0; a < numActive; a++) {
+				if (active[a] == event->body) break;
+			}
+			active[a] = active[--numActive];
 		}
 	}
 
 	free(active);
-}
-#endif
 
+	*collidersOut = colliders;
+	*numCollidersOut = numColliders;
+}
+
+void
+tin_sweep_prune(Tin_SweepPrune *sap,
+	Tin_Body ***collidersOut, size_t *numCollidersOut)
+{
+	Tin_Body **colliders;
+	size_t numColliders;
+
+	tin_sweep_prune_axis(sap, 0, NULL, &colliders, &numColliders);
+
+	Tin_PairTable filter;
+	tin_create_pairtable(&filter);
+	
+	for (size_t i = 0; i < numColliders; i += 2) {
+		tin_insert_pair(&filter, (uintptr_t)colliders[i], (uintptr_t)colliders[i+1], NULL);
+	}
+	free(colliders);
+
+	tin_sweep_prune_axis(sap, 1, &filter, &colliders, &numColliders);
+
+	tin_reset_pairtable(&filter);
+	for (size_t i = 0; i < numColliders; i += 2) {
+		tin_insert_pair(&filter, (uintptr_t)colliders[i], (uintptr_t)colliders[i+1], NULL);
+	}
+	free(colliders);
+
+	tin_sweep_prune_axis(sap, 2, &filter, &colliders, &numColliders);
+
+	tin_destroy_pairtable(&filter);
+
+	*collidersOut = colliders;
+	*numCollidersOut = numColliders;
+}

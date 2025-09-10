@@ -245,8 +245,8 @@ void tin_resize_pairtable(Tin_PairTable *table, size_t newCapac);
 void tin_order_pair(size_t *elemLow, size_t *elemHigh);
 uint32_t tin_hash_pair(size_t elemLow, size_t elemHigh);
 size_t tin_fold_hash(size_t capac, uint32_t hash);
-size_t tin_pairtable_index(Tin_PairTable *table, size_t elemLow, size_t elemHigh);
-bool tin_find_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void **payloadOut);
+size_t tin_pairtable_index(const Tin_PairTable *table, size_t elemLow, size_t elemHigh);
+bool tin_find_pair(const Tin_PairTable *table, size_t elemA, size_t elemB, void **payloadOut);
 void tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload);
 void tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB);
 
@@ -280,5 +280,33 @@ void tin_broadphase(Tin_Scene *scene);
 void tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6]);
 
 Tin_Body *tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass);
+
+/* === Broadphase === :broad: */
+
+typedef struct {
+	Tin_Body *body;
+	Tin_Scalar value;
+	bool isMin;
+} Tin_SweepEvent;
+
+typedef struct {
+	size_t numEvents;
+	size_t capEvents;
+	Tin_SweepEvent *events;
+} Tin_SweepAxis;
+
+typedef struct {
+	Tin_Scene *scene;
+	Tin_SweepAxis axes[3];
+} Tin_SweepPrune;
+
+void tin_create_sweep_prune(Tin_SweepPrune *sap, Tin_Scene *scene);
+void tin_destroy_sweep_prune(Tin_SweepPrune *sap);
+void tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_Body *body);
+void tin_sweep_prune_update(Tin_SweepPrune *sap);
+void tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const Tin_PairTable *filter,
+	Tin_Body ***collidersOut, size_t *numCollidersOut);
+void tin_sweep_prune(Tin_SweepPrune *sap,
+	Tin_Body ***collidersOut, size_t *numCollidersOut);
 
 #endif
