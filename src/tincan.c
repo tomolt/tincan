@@ -1436,50 +1436,23 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 void
 tin_bloom_hash(uintptr_t key1, uintptr_t key2, unsigned hashes[3])
 {
-	union {
-		uintptr_t k[2];
-		unsigned char b[sizeof(uintptr_t[2])];
-	} u;
-
+	uint64_t x;
 	if (key1 < key2) {
-		u.k[0] = key1;
-		u.k[1] = key2;
+		x = (key1 << 32) ^ key2;
 	} else {
-		u.k[0] = key2;
-		u.k[1] = key1;
+		x = (key2 << 32) ^ key1;
 	}
 
-	/* FNV-1a hash */
-	uint64_t hash = UINT64_C(14695981039346656037);
-	int i = 0;
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
-	hash ^= u.b[i++];
-	hash *= UINT64_C(1099511628211);
+	/* Some 64-bit bijective hash function, taken from:
+	 * https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
+	 */
+	x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+	x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+	x = x ^ (x >> 31);
 
-	hashes[0] = hash & 0x1FFFFF;
-	hashes[1] = (hash >> 21) & 0x1FFFFF;
-	hashes[2] = (hash >> 42) & 0x1FFFFF;
+	hashes[0] = x & 0x1FFFFF;
+	hashes[1] = (x >> 21) & 0x1FFFFF;
+	hashes[2] = (x >> 42) & 0x1FFFFF;
 }
 
 #define SET_BIT(u,i) ((u)[(i) / (8*sizeof*(u))] |= 1U << ((i) % (8*sizeof*(u))))
