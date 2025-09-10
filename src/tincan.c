@@ -1620,6 +1620,20 @@ tin_sweep_prune(Tin_SweepPrune *sap,
 
 	free(bloomFilter);
 
+	/* Eliminate false positives */
+	size_t w = 0;
+	for (size_t i = 0; i < numColliders; i += 2) {
+		Tin_Vec3 diff = tin_sub_v3(colliders[i+1]->transform.translation, colliders[i+0]->transform.translation);
+		Tin_Scalar radii =
+			colliders[i+1]->shape->radius * colliders[i+1]->transform.scale +
+			colliders[i+0]->shape->radius * colliders[i+0]->transform.scale;
+		if (tin_dot_v3(diff, diff) <= radii * radii) {
+			colliders[w++] = colliders[i+0];
+			colliders[w++] = colliders[i+1];
+		}
+	}
+	numColliders = w;
+
 	*collidersOut = colliders;
 	*numCollidersOut = numColliders;
 }
