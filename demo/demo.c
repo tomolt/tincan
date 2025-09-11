@@ -279,7 +279,6 @@ main(void)
 
 	scene.numBodies = 0;
 	TIN_LIST_INIT(scene.bodies);
-	scene.bodyAllocator = (Tin_Allocator) { (void *) sizeof (Tin_Body), custom_alloc, custom_free };
 	tin_create_pairtable(&scene.contactCache);
 	tin_create_sweep_prune(&sweep_prune, &scene);
 	scene.sweepPrune = &sweep_prune;
@@ -374,6 +373,7 @@ main(void)
 		render_start_scene_pass(width, height);
 		draw_objects();
 
+#if 0
 		render_start_overlay();
 		for (int o = 0; o < num_objects; o++) {
 			Object *obj = &objects[o];
@@ -385,6 +385,7 @@ main(void)
 			}
 		}
 		render_draw_lines(TIN_VEC3(0.0, 0.0, 1.0));
+#endif
 
 #if 0
 		render_start_overlay();

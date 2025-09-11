@@ -113,6 +113,8 @@ void tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_
 
 /* === Rigid Bodies === :body: */
 
+typedef uint32_t Tin_BodyID;
+
 typedef struct Tin_Body Tin_Body;
 struct Tin_Body {
 	Tin_List      node;
@@ -266,7 +268,9 @@ typedef struct Tin_SweepPrune Tin_SweepPrune;
 typedef struct Tin_Scene {
 	Tin_List bodies;
 	size_t numBodies;
-	Tin_Allocator bodyAllocator;
+	Tin_Body  *bodyTable;
+	Tin_BodyID freeBodyID;
+	Tin_BodyID bodyTableCapac;
 	Tin_PairTable contactCache;
 	Tin_Arbiter *arbiters;
 	size_t numArbiters;

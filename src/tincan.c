@@ -1415,7 +1415,22 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 Tin_Body *
 tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 {
-	Tin_Body *body = scene->bodyAllocator.alloc(scene->bodyAllocator.userPointer);
+	if (scene->freeBodyID == scene->bodyTableCapac) {
+		scene->bodyTableCapac *= 2;
+		if (!scene->bodyTableCapac) scene->bodyTableCapac = 16;
+		scene->bodyTable = realloc(scene->bodyTable,
+			scene->bodyTableCapac * sizeof *scene->bodyTable);
+		for (Tin_BodyID i = scene->freeBodyID; i < scene->bodyTableCapac; i++) {
+			Tin_BodyID *nextField = (Tin_BodyID *)&scene->bodyTable[i];
+			*nextField = i + 1;
+		}
+	}
+
+	Tin_BodyID bodyID = scene->freeBodyID;
+	Tin_BodyID *nextField = (Tin_BodyID *)&scene->bodyTable[bodyID];
+	scene->freeBodyID = *nextField;
+
+	Tin_Body *body = &scene->bodyTable[bodyID];
 	memset(body, 0, sizeof *body);
 	body->bodyIdx = scene->numBodies++;
 	body->transform = (Tin_Transform) {
