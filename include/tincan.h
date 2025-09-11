@@ -285,10 +285,10 @@ void tin_scene_update(Tin_Scene *scene);
 void tin_scene_prestep(Tin_Scene *scene, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
 void tin_scene_step(Tin_Scene *scene, Tin_Scalar (*velocities)[6]);
 void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
-void tin_broadphase(Tin_Scene *scene);
 void tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6]);
 
 Tin_Body *tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass);
+void      tin_delete_body(Tin_Scene *scene, Tin_BodyID bodyID);
 
 /* === Broadphase === :broad: */
 
@@ -318,6 +318,7 @@ typedef struct Tin_SweepPrune {
 void tin_create_sweep_prune(Tin_SweepPrune *sap, Tin_Scene *scene);
 void tin_destroy_sweep_prune(Tin_SweepPrune *sap);
 void tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_Body *body);
+void tin_sweep_prune_delete_body(Tin_SweepPrune *sap, Tin_Body *body);
 void tin_sweep_prune_update(Tin_SweepPrune *sap);
 void tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const unsigned *bloomFilter,
 	Tin_Body ***collidersOut, size_t *numCollidersOut);

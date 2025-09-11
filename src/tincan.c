@@ -1219,37 +1219,6 @@ tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 }
 
 void
-tin_broadphase(Tin_Scene *scene)
-{
-	size_t capac = scene->capArbiters, count = 0;
-	Tin_Arbiter *arbiters = scene->arbiters;
-
-	int body1Idx = 0;
-	TIN_FOR_EACH(body1, scene->bodies, Tin_Body, node) {
-		int body2Idx = body1Idx + 1;
-		TIN_FOR_RANGE(body2, body1->node, scene->bodies, Tin_Body, node) {
-			Tin_Vec3 diff = tin_sub_v3(body2->transform.translation, body1->transform.translation);
-			Tin_Scalar radii =
-				body2->shape->radius * body2->transform.scale +
-				body1->shape->radius * body1->transform.scale;
-			if (tin_dot_v3(diff, diff) <= radii * radii) {
-				if (count == capac) {
-					capac = capac ? 2*capac : 16;
-					arbiters = realloc(arbiters, capac * sizeof *arbiters);
-				}
-				arbiters[count++] = (Tin_Arbiter){ .body1 = body1, .body2 = body2, .body1Idx = body1Idx, .body2Idx = body2Idx };
-			}
-			body2Idx++;
-		}
-		body1Idx++;
-	}
-
-	scene->arbiters = arbiters;
-	scene->numArbiters = count;
-	scene->capArbiters = capac;
-}
-
-void
 tin_narrowphase(Tin_Scene *scene)
 {
 	for (size_t i = 0; i < scene->numArbiters; i++) {
@@ -1446,6 +1415,16 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 	return body;
 }
 
+void
+tin_delete_body(Tin_Scene *scene, Tin_BodyID bodyID)
+{
+	if (bodyID >= scene->bodyTableCapac) return;
+	tin_sweep_prune_delete_body(scene->sweepPrune, &scene->bodyTable[bodyID]);
+	Tin_BodyID *nextField = (Tin_BodyID *)&scene->bodyTable[bodyID];
+	*nextField = scene->freeBodyID;
+	scene->freeBodyID = bodyID;
+}
+
 /* === Broadphase === :broad: */
 
 void
@@ -1535,6 +1514,22 @@ tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_Body *body)
 			.value =  INFINITY,
 			.isMin =  false
 		};
+	}
+}
+
+void
+tin_sweep_prune_delete_body(Tin_SweepPrune *sap, Tin_Body *body)
+{
+	for (int a = 0; a < 3; a++) {
+		Tin_SweepAxis *axis = &sap->axes[a];
+		for (size_t e = 0; e < axis->numEvents; e++) {
+			if (axis->events[e].body == body) {
+				axis->events[e] = axis->events[--axis->numEvents];
+				// If event count is even again, we must have deleted
+				// both events, so we can exit early.
+				if ((axis->numEvents & 1) == 0) break;
+			}
+		}
 	}
 }
 
