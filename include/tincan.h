@@ -117,9 +117,6 @@ typedef uint32_t Tin_BodyID;
 
 typedef struct Tin_Body Tin_Body;
 struct Tin_Body {
-	Tin_List      node;
-	int           bodyIdx;
-
 	const Tin_Shape *shape;
 	Tin_Transform transform;
 	
@@ -209,10 +206,8 @@ typedef struct {
 */
 
 typedef struct {
-	Tin_Body *body1;
-	Tin_Body *body2;
-	int body1Idx;
-	int body2Idx;
+	int bodyID1;
+	int bodyID2;
 	int face1;
 	int face2;
 	Tin_Vec3 normal;
@@ -223,7 +218,9 @@ typedef struct {
 	Tin_Contact contacts[TIN_MAX_CONTACTS];
 } Tin_Arbiter;
 
-void tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
+typedef struct Tin_Scene Tin_Scene;
+
+void tin_arbiter_prestep(Tin_Scene *scene, Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
 
 /* === Pair-Indexed Hashtable === :pair: */
 
@@ -266,18 +263,20 @@ void tin_build_islands(Tin_Scene *scene);
 typedef struct Tin_SweepPrune Tin_SweepPrune;
 
 typedef struct Tin_Scene {
-	Tin_List bodies;
-	size_t numBodies;
 	Tin_Body  *bodyTable;
+	bool      *bodyOccupied;
 	Tin_BodyID freeBodyID;
 	Tin_BodyID bodyTableCapac;
-	Tin_PairTable contactCache;
+
 	Tin_Arbiter *arbiters;
 	size_t numArbiters;
 	size_t capArbiters;
+
+	Tin_PairTable contactCache;
 	Tin_Arbiter *oldArbiters;
 	size_t numOldArbiters;
 	size_t capOldArbiters;
+	
 	Tin_SweepPrune *sweepPrune;
 } Tin_Scene;
 

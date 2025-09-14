@@ -815,13 +815,13 @@ tin_build_constraint_1d(Tin_Constraint1D *constraint,
 }
 
 void
-tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt)
+tin_arbiter_prestep(Tin_Scene *scene, Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt)
 {
 	const Tin_Scalar allowedPenetration = 0.01;
 	const Tin_Scalar biasFactor = 0.1;
 
-	Tin_Scalar *vel1 = velocities[arbiter->body1Idx];
-	Tin_Scalar *vel2 = velocities[arbiter->body2Idx];
+	Tin_Scalar *vel1 = velocities[arbiter->bodyID1];
+	Tin_Scalar *vel2 = velocities[arbiter->bodyID2];
 	Tin_Vec3 relVel = tin_sub_v3(TIN_VEC3(vel1[0], vel1[2], vel1[4]), TIN_VEC3(vel2[0], vel2[2], vel2[4]));
 	Tin_Vec3 frictionDir = tin_gram_schmidt(arbiter->normal, relVel);
 	if (tin_dot_v3(frictionDir, frictionDir) < 0.001) {
@@ -836,26 +836,29 @@ tin_arbiter_prestep(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scala
 	arbiter->frictionDir = frictionDir;
 	arbiter->orthoDir = orthoDir;
 
+	Tin_Body *body1 = &scene->bodyTable[arbiter->bodyID1];
+	Tin_Body *body2 = &scene->bodyTable[arbiter->bodyID2];
+
 	for (int i = 0; i < arbiter->numPenetrating; i++) {
 		Tin_Contact *contact = &arbiter->contacts[i];
 
 		tin_build_constraint_1d(&contact->normalConstraint,
-			arbiter->body1->invMass, arbiter->body1->invInertia,
-			arbiter->body2->invMass, arbiter->body2->invInertia,
+			body1->invMass, body1->invInertia,
+			body2->invMass, body2->invInertia,
 			contact->posFrom1, contact->posFrom2,
 			arbiter->normal);
 		contact->normalConstraint.minMagnitude = 0.0;
 		contact->normalConstraint.bias = -biasFactor * invDt * MIN(0.0, contact->separation + allowedPenetration);
 
 		tin_build_constraint_1d(&contact->tangentConstraint1,
-			arbiter->body1->invMass, arbiter->body1->invInertia,
-			arbiter->body2->invMass, arbiter->body2->invInertia,
+			body1->invMass, body1->invInertia,
+			body2->invMass, body2->invInertia,
 			contact->posFrom1, contact->posFrom2,
 			arbiter->frictionDir);
 
 		tin_build_constraint_1d(&contact->tangentConstraint2,
-			arbiter->body1->invMass, arbiter->body1->invInertia,
-			arbiter->body2->invMass, arbiter->body2->invInertia,
+			body1->invMass, body1->invInertia,
+			body2->invMass, body2->invInertia,
 			contact->posFrom1, contact->posFrom2,
 			arbiter->orthoDir);
 	}
@@ -882,9 +885,9 @@ tin_arbiter_warm_start(Tin_Scalar (*velocities)[6], Tin_Arbiter *arbiter, const 
 				contact->tangentConstraint1.accumMagnitude = oldContact->tangentConstraint1.accumMagnitude;
 				contact->tangentConstraint2.accumMagnitude = oldContact->tangentConstraint2.accumMagnitude;
 
-				tin_apply_impulse(&contact->normalConstraint, velocities[arbiter->body1Idx], velocities[arbiter->body2Idx]);
-				tin_apply_impulse(&contact->tangentConstraint1, velocities[arbiter->body1Idx], velocities[arbiter->body2Idx]);
-				tin_apply_impulse(&contact->tangentConstraint2, velocities[arbiter->body1Idx], velocities[arbiter->body2Idx]);
+				tin_apply_impulse(&contact->normalConstraint, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);
+				tin_apply_impulse(&contact->tangentConstraint1, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);
+				tin_apply_impulse(&contact->tangentConstraint2, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);
 				break;
 			}
 		}
@@ -896,7 +899,7 @@ tin_arbiter_apply_separation(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6])
 {
 	for (int idx = 0; idx < arbiter->numPenetrating; idx++) {
 		Tin_Contact *contact = &arbiter->contacts[idx];
-		tin_enforce_constraint_1d(&contact->normalConstraint, velocities[arbiter->body1Idx], velocities[arbiter->body2Idx]);
+		tin_enforce_constraint_1d(&contact->normalConstraint, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);
 	}
 }
 
@@ -912,8 +915,8 @@ tin_arbiter_apply_friction(Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6])
 		contact->tangentConstraint1.maxMagnitude =  frictionLimit;
 		contact->tangentConstraint2.minMagnitude = -frictionLimit;
 		contact->tangentConstraint2.maxMagnitude =  frictionLimit;
-		tin_enforce_constraint_1d(&contact->tangentConstraint1, velocities[arbiter->body1Idx], velocities[arbiter->body2Idx]);
-		tin_enforce_constraint_1d(&contact->tangentConstraint2, velocities[arbiter->body1Idx], velocities[arbiter->body2Idx]);
+		tin_enforce_constraint_1d(&contact->tangentConstraint1, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);
+		tin_enforce_constraint_1d(&contact->tangentConstraint2, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);
 	}
 }
 
@@ -1110,26 +1113,28 @@ tin_island_union(Tin_Body *body1, Tin_Body *body2)
 void
 tin_build_islands(Tin_Scene *scene)
 {
-	{
-		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
-			body->island = body;
-			body->islandStable = true;
-		}
+	for (Tin_BodyID i = 0; i < scene->bodyTableCapac; i++) {
+		if (!scene->bodyOccupied[i]) continue;
+		Tin_Body *body = &scene->bodyTable[i];
+		body->island = body;
+		body->islandStable = true;
 	}
 
 	for (size_t i = 0; i < scene->numArbiters; i++) {
 		Tin_Arbiter *arbiter = &scene->arbiters[i];
-		if (arbiter->body1->invMass != 0.0 && arbiter->body2->invMass != 0.0) {
-			tin_island_union(arbiter->body1, arbiter->body2);
+		Tin_Body *body1 = &scene->bodyTable[arbiter->bodyID1];
+		Tin_Body *body2 = &scene->bodyTable[arbiter->bodyID2];
+		if (body1->invMass != 0.0 && body2->invMass != 0.0) {
+			tin_island_union(body1, body2);
 		}
 	}
 
-	{
-		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
-			if (body->restCounter >= 5 || body->invMass == 0.0) continue;
-			Tin_Body *island = tin_island_find(body);
-			island->islandStable = false;
-		}
+	for (Tin_BodyID i = 0; i < scene->bodyTableCapac; i++) {
+		if (!scene->bodyOccupied[i]) continue;
+		Tin_Body *body = &scene->bodyTable[i];
+		if (body->restCounter >= 5 || body->invMass == 0.0) continue;
+		Tin_Body *island = tin_island_find(body);
+		island->islandStable = false;
 	}
 }
 
@@ -1138,7 +1143,10 @@ tin_build_islands(Tin_Scene *scene)
 void
 tin_scene_update(Tin_Scene *scene)
 {
-	TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+	for (Tin_BodyID i = 0; i < scene->bodyTableCapac; i++) {
+		if (!scene->bodyOccupied[i]) continue;
+		Tin_Body *body = &scene->bodyTable[i];
+
 		Tin_Scalar *rotation = body->transform.rotation;
 
 		/* Compute product = rotation * inertia_local^-1 */
@@ -1160,9 +1168,9 @@ void
 tin_scene_prestep(Tin_Scene *scene, Tin_Scalar (*velocities)[6], Tin_Scalar invDt)
 {
 	for (size_t i = 0; i < scene->numArbiters; i++) {
-		tin_arbiter_prestep(&scene->arbiters[i], velocities, invDt);
+		tin_arbiter_prestep(scene, &scene->arbiters[i], velocities, invDt);
 		void *payload;
-		if (tin_find_pair(&scene->contactCache, (uintptr_t)scene->arbiters[i].body1, (uintptr_t)scene->arbiters[i].body2, &payload)) {
+		if (tin_find_pair(&scene->contactCache, scene->arbiters[i].bodyID1, scene->arbiters[i].bodyID2, &payload)) {
 			tin_arbiter_warm_start(velocities, &scene->arbiters[i], payload);
 		}
 	}
@@ -1182,7 +1190,10 @@ tin_scene_step(Tin_Scene *scene, Tin_Scalar (*velocities)[6])
 void
 tin_integrate(Tin_Scene *scene, Tin_Scalar dt)
 {
-	TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
+	for (Tin_BodyID i = 0; i < scene->bodyTableCapac; i++) {
+		if (!scene->bodyOccupied[i]) continue;
+		Tin_Body *body = &scene->bodyTable[i];
+
 		bool stable = true;
 
 		if (tin_dot_v3(body->velocity, body->velocity) > 1000.0f * TIN_EPSILON) {
@@ -1222,9 +1233,12 @@ void
 tin_narrowphase(Tin_Scene *scene)
 {
 	for (size_t i = 0; i < scene->numArbiters; i++) {
-		scene->arbiters[i].numContacts = tin_polytope_collide(
-				&scene->arbiters[i].body1->shape->polytope, &scene->arbiters[i].body1->transform,
-				&scene->arbiters[i].body2->shape->polytope, &scene->arbiters[i].body2->transform, &scene->arbiters[i]);
+		Tin_Arbiter *arbiter = &scene->arbiters[i];
+		Tin_Body *body1 = &scene->bodyTable[arbiter->bodyID1];
+		Tin_Body *body2 = &scene->bodyTable[arbiter->bodyID2];
+		arbiter->numContacts = tin_polytope_collide(
+				&body1->shape->polytope, &body1->transform,
+				&body2->shape->polytope, &body2->transform, &scene->arbiters[i]);
 	}
 	size_t numOut = 0;
 	for (size_t i = 0; i < scene->numArbiters; i++) {
@@ -1264,23 +1278,19 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 			scene->arbiters = realloc(scene->arbiters, scene->capArbiters * sizeof *scene->arbiters);
 		}
 		scene->arbiters[scene->numArbiters++] = (Tin_Arbiter){
-			.body1 = broad[i],
-			.body2 = broad[i+1],
-			.body1Idx = broad[i]->bodyIdx,
-			.body2Idx = broad[i+1]->bodyIdx,
+			.bodyID1 = broad[i]->bodyIdx,
+			.bodyID2 = broad[i+1]->bodyIdx,
 		};
 	}
 	free(broad);
 
 	tin_build_islands(scene);
 	/* Apply Gravity */
-	size_t numBodies = 0;
-	{
-		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
-			if (!tin_island_find(body)->islandStable) {
-				body->velocity = tin_saxpy_v3(dt, TIN_VEC3(0.0, -9.0, 0.0), body->velocity);
-			}
-			numBodies++;
+	for (Tin_BodyID i = 0; i < scene->bodyTableCapac; i++) {
+		if (!scene->bodyOccupied[i]) continue;
+		Tin_Body *body = &scene->bodyTable[i];
+		if (!tin_island_find(body)->islandStable) {
+			body->velocity = tin_saxpy_v3(dt, TIN_VEC3(0.0, -9.0, 0.0), body->velocity);
 		}
 	}
 
@@ -1288,12 +1298,16 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	size_t oldNumArbiters = scene->numArbiters;
 	scene->numArbiters = 0;
 	for (size_t i = 0; i < oldNumArbiters; i++) {
-		if (tin_island_find(scene->arbiters[i].body1)->islandStable) {
-			if (tin_island_find(scene->arbiters[i].body2)->islandStable) {
+		Tin_Arbiter *arbiter = &scene->arbiters[i];
+		Tin_Body *body1 = &scene->bodyTable[arbiter->bodyID1];
+		Tin_Body *body2 = &scene->bodyTable[arbiter->bodyID2];
+
+		if (tin_island_find(body1)->islandStable) {
+			if (tin_island_find(body2)->islandStable) {
 				continue;
 			}
 		}
-		scene->arbiters[scene->numArbiters++] = scene->arbiters[i];
+		scene->arbiters[scene->numArbiters++] = *arbiter;
 	}
 	printf("#collisions = %zu\n", scene->numArbiters);
 
@@ -1306,18 +1320,17 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	if (timings) timings[2] += stopTime - startTime;
 	
 	// We keep some padding at the end so we can more easily load values into SIMD registers.
-	Tin_Scalar (*velocities)[6] = calloc((numBodies + 1), sizeof (Tin_Scalar[6]));
-	{
-		size_t b = 0;
-		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
-			velocities[b][0] = body->velocity.c[0];
-			velocities[b][1] = body->angularVelocity.c[0];
-			velocities[b][2] = body->velocity.c[1];
-			velocities[b][3] = body->angularVelocity.c[1];
-			velocities[b][4] = body->velocity.c[2];
-			velocities[b][5] = body->angularVelocity.c[2];
-			b++;
-		}
+	Tin_Scalar (*velocities)[6] = calloc((scene->bodyTableCapac + 1), sizeof (Tin_Scalar[6]));
+	for (Tin_BodyID i = 0; i < scene->bodyTableCapac; i++) {
+		if (!scene->bodyOccupied[i]) continue;
+		Tin_Body *body = &scene->bodyTable[i];
+
+		velocities[i][0] = body->velocity.c[0];
+		velocities[i][1] = body->angularVelocity.c[0];
+		velocities[i][2] = body->velocity.c[1];
+		velocities[i][3] = body->angularVelocity.c[1];
+		velocities[i][4] = body->velocity.c[2];
+		velocities[i][5] = body->angularVelocity.c[2];
 	}
 	
 	startTime = gettime ? gettime() : 0.0;
@@ -1332,17 +1345,16 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	stopTime = gettime ? gettime() : 0.0;
 	if (timings) timings[4] += stopTime - startTime;
 
-	{
-		size_t b = 0;
-		TIN_FOR_EACH(body, scene->bodies, Tin_Body, node) {
-			body->velocity.c[0] = velocities[b][0];
-			body->angularVelocity.c[0] = velocities[b][1];
-			body->velocity.c[1] = velocities[b][2];
-			body->angularVelocity.c[1] = velocities[b][3];
-			body->velocity.c[2] = velocities[b][4];
-			body->angularVelocity.c[2] = velocities[b][5];
-			b++;
-		}
+	for (Tin_BodyID i = 0; i < scene->bodyTableCapac; i++) {
+		if (!scene->bodyOccupied[i]) continue;
+		Tin_Body *body = &scene->bodyTable[i];
+
+		body->velocity.c[0] = velocities[i][0];
+		body->angularVelocity.c[0] = velocities[i][1];
+		body->velocity.c[1] = velocities[i][2];
+		body->angularVelocity.c[1] = velocities[i][3];
+		body->velocity.c[2] = velocities[i][4];
+		body->angularVelocity.c[2] = velocities[i][5];
 	}
 	free(velocities);
 
@@ -1373,7 +1385,7 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	for (size_t i = 0; i < scene->numOldArbiters; i++) {
 		Tin_Arbiter *arbiter = &scene->oldArbiters[i];
 		tin_insert_pair(&scene->contactCache,
-			(uintptr_t)arbiter->body1, (uintptr_t)arbiter->body2,
+			arbiter->bodyID1, arbiter->bodyID2,
 			arbiter);
 	}
 	tin_integrate(scene, dt);
@@ -1389,19 +1401,22 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 		if (!scene->bodyTableCapac) scene->bodyTableCapac = 16;
 		scene->bodyTable = realloc(scene->bodyTable,
 			scene->bodyTableCapac * sizeof *scene->bodyTable);
+		scene->bodyOccupied = realloc(scene->bodyOccupied,
+			scene->bodyTableCapac * sizeof *scene->bodyOccupied);
 		for (Tin_BodyID i = scene->freeBodyID; i < scene->bodyTableCapac; i++) {
+			scene->bodyOccupied[i] = false;
 			Tin_BodyID *nextField = (Tin_BodyID *)&scene->bodyTable[i];
 			*nextField = i + 1;
 		}
 	}
 
 	Tin_BodyID bodyID = scene->freeBodyID;
+	scene->bodyOccupied[bodyID] = true;
 	Tin_BodyID *nextField = (Tin_BodyID *)&scene->bodyTable[bodyID];
 	scene->freeBodyID = *nextField;
 
 	Tin_Body *body = &scene->bodyTable[bodyID];
 	memset(body, 0, sizeof *body);
-	body->bodyIdx = scene->numBodies++;
 	body->transform = (Tin_Transform) {
 		{ 1, 0, 0, 0, 1, 0, 0, 0, 1 },
 		TIN_VEC3(0, 0, 0),
@@ -1409,8 +1424,6 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 	};
 	body->shape = shape;
 	body->invMass = invMass;
-	TIN_LIST_LINK(*scene->bodies.prev, body->node);
-	TIN_LIST_LINK(body->node, scene->bodies);
 	tin_sweep_prune_add_body(scene->sweepPrune, body);
 	return body;
 }
@@ -1419,6 +1432,8 @@ void
 tin_delete_body(Tin_Scene *scene, Tin_BodyID bodyID)
 {
 	if (bodyID >= scene->bodyTableCapac) return;
+	if (!scene->bodyOccupied[bodyID]) return;
+	scene->bodyOccupied[bodyID] = false;
 	tin_sweep_prune_delete_body(scene->sweepPrune, &scene->bodyTable[bodyID]);
 	Tin_BodyID *nextField = (Tin_BodyID *)&scene->bodyTable[bodyID];
 	*nextField = scene->freeBodyID;

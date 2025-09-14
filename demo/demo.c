@@ -277,8 +277,6 @@ main(void)
 	glfwGetCursorPos(window, &camera.cursor_x, &camera.cursor_y);
 	camera.position.c[2] = 5.0f;
 
-	scene.numBodies = 0;
-	TIN_LIST_INIT(scene.bodies);
 	tin_create_pairtable(&scene.contactCache);
 	tin_create_sweep_prune(&sweep_prune, &scene);
 	scene.sweepPrune = &sweep_prune;
