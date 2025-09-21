@@ -298,7 +298,7 @@ void tin_bloom_insert(unsigned *bloom, uintptr_t key1, uintptr_t key2);
 bool tin_bloom_lookup(const unsigned *bloom, uintptr_t key1, uintptr_t key2);
 
 typedef struct {
-	Tin_Body *body;
+	Tin_BodyID bodyID;
 	Tin_Scalar value;
 	bool isMin;
 } Tin_SweepEvent;
@@ -316,12 +316,12 @@ typedef struct Tin_SweepPrune {
 
 void tin_create_sweep_prune(Tin_SweepPrune *sap, Tin_Scene *scene);
 void tin_destroy_sweep_prune(Tin_SweepPrune *sap);
-void tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_Body *body);
-void tin_sweep_prune_delete_body(Tin_SweepPrune *sap, Tin_Body *body);
+void tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_BodyID bodyID);
+void tin_sweep_prune_delete_body(Tin_SweepPrune *sap, Tin_BodyID bodyID);
 void tin_sweep_prune_update(Tin_SweepPrune *sap);
 void tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const unsigned *bloomFilter,
-	Tin_Body ***collidersOut, size_t *numCollidersOut);
+	Tin_BodyID **collidersOut, size_t *numCollidersOut);
 void tin_sweep_prune(Tin_SweepPrune *sap,
-	Tin_Body ***collidersOut, size_t *numCollidersOut);
+	Tin_BodyID **collidersOut, size_t *numCollidersOut);
 
 #endif

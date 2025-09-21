@@ -1268,7 +1268,7 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	
 	startTime = gettime ? gettime() : 0.0;
 	tin_sweep_prune_update(scene->sweepPrune);
-	Tin_Body **broad;
+	Tin_BodyID *broad;
 	size_t numBroad;
 	tin_sweep_prune(scene->sweepPrune, &broad, &numBroad);
 	scene->numArbiters = 0;
@@ -1278,8 +1278,8 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 			scene->arbiters = realloc(scene->arbiters, scene->capArbiters * sizeof *scene->arbiters);
 		}
 		scene->arbiters[scene->numArbiters++] = (Tin_Arbiter){
-			.bodyID1 = broad[i]->bodyIdx,
-			.bodyID2 = broad[i+1]->bodyIdx,
+			.bodyID1 = broad[i],
+			.bodyID2 = broad[i+1],
 		};
 	}
 	free(broad);
@@ -1424,7 +1424,7 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 	};
 	body->shape = shape;
 	body->invMass = invMass;
-	tin_sweep_prune_add_body(scene->sweepPrune, body);
+	tin_sweep_prune_add_body(scene->sweepPrune, bodyID);
 	return body;
 }
 
@@ -1434,7 +1434,7 @@ tin_delete_body(Tin_Scene *scene, Tin_BodyID bodyID)
 	if (bodyID >= scene->bodyTableCapac) return;
 	if (!scene->bodyOccupied[bodyID]) return;
 	scene->bodyOccupied[bodyID] = false;
-	tin_sweep_prune_delete_body(scene->sweepPrune, &scene->bodyTable[bodyID]);
+	tin_sweep_prune_delete_body(scene->sweepPrune, bodyID);
 	Tin_BodyID *nextField = (Tin_BodyID *)&scene->bodyTable[bodyID];
 	*nextField = scene->freeBodyID;
 	scene->freeBodyID = bodyID;
@@ -1510,7 +1510,7 @@ tin_destroy_sweep_prune(Tin_SweepPrune *sap)
 }
 
 void
-tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_Body *body)
+tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_BodyID bodyID)
 {
 	for (int a = 0; a < 3; a++) {
 		Tin_SweepAxis *axis = &sap->axes[a];
@@ -1520,25 +1520,25 @@ tin_sweep_prune_add_body(Tin_SweepPrune *sap, Tin_Body *body)
 			axis->events = realloc(axis->events, axis->capEvents * sizeof *axis->events);
 		}
 		axis->events[axis->numEvents++] = (Tin_SweepEvent){
-			.body  =  body,
-			.value = -INFINITY,
-			.isMin =  true
+			.bodyID =  bodyID,
+			.value  = -INFINITY,
+			.isMin  =  true
 		};
 		axis->events[axis->numEvents++] = (Tin_SweepEvent){
-			.body  =  body,
-			.value =  INFINITY,
-			.isMin =  false
+			.bodyID =  bodyID,
+			.value  =  INFINITY,
+			.isMin  =  false
 		};
 	}
 }
 
 void
-tin_sweep_prune_delete_body(Tin_SweepPrune *sap, Tin_Body *body)
+tin_sweep_prune_delete_body(Tin_SweepPrune *sap, Tin_BodyID bodyID)
 {
 	for (int a = 0; a < 3; a++) {
 		Tin_SweepAxis *axis = &sap->axes[a];
 		for (size_t e = 0; e < axis->numEvents; e++) {
-			if (axis->events[e].body == body) {
+			if (axis->events[e].bodyID == bodyID) {
 				axis->events[e] = axis->events[--axis->numEvents];
 				// If event count is even again, we must have deleted
 				// both events, so we can exit early.
@@ -1556,8 +1556,9 @@ tin_sweep_prune_update(Tin_SweepPrune *sap)
 		Tin_SweepAxis *axis = &sap->axes[a];
 		for (size_t e = 0; e < axis->numEvents; e++) {
 			Tin_SweepEvent *event = &axis->events[e];
-			Tin_Vec3 origin = event->body->transform.translation;
-			Tin_Scalar radius = event->body->shape->radius * event->body->transform.scale;
+			const Tin_Body *body = &sap->scene->bodyTable[event->bodyID];
+			Tin_Vec3 origin = body->transform.translation;
+			Tin_Scalar radius = body->shape->radius * body->transform.scale;
 			event->value = origin.c[a] + (event->isMin ? -radius : radius);
 		}
 	}
@@ -1577,15 +1578,15 @@ tin_sweep_prune_update(Tin_SweepPrune *sap)
 
 void
 tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const unsigned *bloomFilter,
-	Tin_Body ***collidersOut, size_t *numCollidersOut)
+	Tin_BodyID **collidersOut, size_t *numCollidersOut)
 {
 	const Tin_SweepAxis *axis = &sap->axes[axisIdx];
 
-	Tin_Body **colliders = NULL;
+	Tin_BodyID *colliders = NULL;
 	size_t numColliders = 0;
 	size_t capColliders = 0;
 
-	Tin_Body **active = calloc(axis->numEvents / 2, sizeof *active);
+	Tin_BodyID *active = calloc(axis->numEvents / 2, sizeof *active);
 	size_t numActive = 0;
 
 	for (size_t e = 0; e < axis->numEvents; e++) {
@@ -1597,16 +1598,16 @@ tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const unsigned *bloomFilt
 					if (!capColliders) capColliders = 16;
 					colliders = realloc(colliders, capColliders * sizeof *colliders);
 				}
-				if (!bloomFilter || tin_bloom_lookup(bloomFilter, (uintptr_t)active[a], (uintptr_t)event->body)) {
+				if (!bloomFilter || tin_bloom_lookup(bloomFilter, active[a], event->bodyID)) {
 					colliders[numColliders++] = active[a];
-					colliders[numColliders++] = event->body;
+					colliders[numColliders++] = event->bodyID;
 				}
 			}
-			active[numActive++] = event->body;
+			active[numActive++] = event->bodyID;
 		} else {
 			size_t a;
 			for (a = 0; a < numActive; a++) {
-				if (active[a] == event->body) break;
+				if (active[a] == event->bodyID) break;
 			}
 			active[a] = active[--numActive];
 		}
@@ -1620,16 +1621,16 @@ tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const unsigned *bloomFilt
 
 void
 tin_sweep_prune(Tin_SweepPrune *sap,
-	Tin_Body ***collidersOut, size_t *numCollidersOut)
+	Tin_BodyID **collidersOut, size_t *numCollidersOut)
 {
-	Tin_Body **colliders;
+	Tin_BodyID *colliders;
 	size_t numColliders;
 
 	tin_sweep_prune_axis(sap, 0, NULL, &colliders, &numColliders);
 
 	unsigned *bloomFilter = calloc(1, TIN_BLOOM_NUM_BITS / 8);
 	for (size_t i = 0; i < numColliders; i += 2) {
-		tin_bloom_insert(bloomFilter, (uintptr_t)colliders[i], (uintptr_t)colliders[i+1]);
+		tin_bloom_insert(bloomFilter, colliders[i], colliders[i+1]);
 	}
 	free(colliders);
 
@@ -1637,7 +1638,7 @@ tin_sweep_prune(Tin_SweepPrune *sap,
 
 	memset(bloomFilter, 0, TIN_BLOOM_NUM_BITS / 8);
 	for (size_t i = 0; i < numColliders; i += 2) {
-		tin_bloom_insert(bloomFilter, (uintptr_t)colliders[i], (uintptr_t)colliders[i+1]);
+		tin_bloom_insert(bloomFilter, colliders[i], colliders[i+1]);
 	}
 	free(colliders);
 
@@ -1648,10 +1649,12 @@ tin_sweep_prune(Tin_SweepPrune *sap,
 	/* Eliminate false positives */
 	size_t w = 0;
 	for (size_t i = 0; i < numColliders; i += 2) {
-		Tin_Vec3 diff = tin_sub_v3(colliders[i+1]->transform.translation, colliders[i+0]->transform.translation);
+		const Tin_Body *body1 = &sap->scene->bodyTable[colliders[i+0]];
+		const Tin_Body *body2 = &sap->scene->bodyTable[colliders[i+1]];
+		Tin_Vec3 diff = tin_sub_v3(body2->transform.translation, body1->transform.translation);
 		Tin_Scalar radii =
-			colliders[i+1]->shape->radius * colliders[i+1]->transform.scale +
-			colliders[i+0]->shape->radius * colliders[i+0]->transform.scale;
+			body2->shape->radius * body2->transform.scale +
+			body1->shape->radius * body1->transform.scale;
 		if (tin_dot_v3(diff, diff) <= radii * radii) {
 			colliders[w++] = colliders[i+0];
 			colliders[w++] = colliders[i+1];
