@@ -511,7 +511,10 @@ tin_reduce_manifold(Tin_Vec3 *points, int count)
 		Tin_Vec3 e1 = tin_sub_v3(points[i], points[j1]);
 		Tin_Vec3 e2 = tin_sub_v3(points[j2], points[i]);
 		Tin_Scalar score = tin_prlgram_area(e1, e2);
-		if (score < bestScore) {
+		// A score of INFINITY is a distinct possibility (e1 = 0),
+		// so we have to make sure that we still pick anybody in that
+		// case.
+		if (score <= bestScore) {
 			idx = i;
 			bestScore = score;
 		}
