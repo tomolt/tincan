@@ -637,7 +637,7 @@ tin_polytope_collide(
 }
 
 Tin_Scalar
-tin_dot_v12(Tin_Scalar a[12], Tin_Scalar b[12])
+tin_dot_v12(const Tin_Scalar a[12], const Tin_Scalar b[12])
 {
 #if TIN_HAS_SSE2
 	float f[4];
@@ -867,6 +867,17 @@ tin_arbiter_prestep(Tin_Scene *scene, Tin_Arbiter *arbiter, Tin_Scalar (*velocit
 	}
 }
 
+Tin_Scalar
+tin_alignof_v12(const Tin_Scalar a[12], const Tin_Scalar b[12])
+{
+	Tin_Scalar aSq = tin_dot_v12(a, a);
+	Tin_Scalar bSq = tin_dot_v12(b, b);
+	Tin_Scalar abLen = sqrt(aSq * bSq);
+	Tin_Scalar proj = tin_dot_v12(a, b);
+	Tin_Scalar projScaled = abLen <= TIN_EPSILON ? 0.0 : (proj / abLen);
+	return MAX(projScaled, 0.0);
+}
+
 void
 tin_arbiter_warm_start(Tin_Scalar (*velocities)[6], Tin_Arbiter *arbiter, const Tin_Arbiter *oldArbiter)
 {
@@ -884,9 +895,12 @@ tin_arbiter_warm_start(Tin_Scalar (*velocities)[6], Tin_Arbiter *arbiter, const 
 			Tin_Scalar dist1Sq = tin_dot_v3(diff1, diff1);
 			Tin_Scalar dist2Sq = tin_dot_v3(diff2, diff2);
 			if (dist1Sq <= maxDistanceSq && dist2Sq <= maxDistanceSq) {
-				contact->normalConstraint.accumMagnitude = oldContact->normalConstraint.accumMagnitude;
-				contact->tangentConstraint1.accumMagnitude = oldContact->tangentConstraint1.accumMagnitude;
-				contact->tangentConstraint2.accumMagnitude = oldContact->tangentConstraint2.accumMagnitude;
+				Tin_Scalar normalProj = tin_alignof_v12(contact->normalConstraint.jacobian, oldContact->normalConstraint.jacobian);
+				contact->normalConstraint.accumMagnitude = 0.8 * normalProj * oldContact->normalConstraint.accumMagnitude;
+				Tin_Scalar tangentProj1 = tin_alignof_v12(contact->tangentConstraint1.jacobian, oldContact->tangentConstraint1.jacobian);
+				contact->tangentConstraint1.accumMagnitude = 0.8 * tangentProj1 * oldContact->tangentConstraint1.accumMagnitude;
+				Tin_Scalar tangentProj2 = tin_alignof_v12(contact->tangentConstraint2.jacobian, oldContact->tangentConstraint2.jacobian);
+				contact->tangentConstraint2.accumMagnitude = 0.8 * tangentProj2 * oldContact->tangentConstraint2.accumMagnitude;
 
 				tin_apply_impulse(&contact->normalConstraint, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);
 				tin_apply_impulse(&contact->tangentConstraint1, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);
@@ -1172,10 +1186,12 @@ tin_scene_prestep(Tin_Scene *scene, Tin_Scalar (*velocities)[6], Tin_Scalar invD
 {
 	for (size_t i = 0; i < scene->numArbiters; i++) {
 		tin_arbiter_prestep(scene, &scene->arbiters[i], velocities, invDt);
+#if 1
 		void *payload;
 		if (tin_find_pair(&scene->contactCache, scene->arbiters[i].bodyID1, scene->arbiters[i].bodyID2, &payload)) {
 			tin_arbiter_warm_start(velocities, &scene->arbiters[i], payload);
 		}
+#endif
 	}
 }
 
