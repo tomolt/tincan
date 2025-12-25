@@ -16,9 +16,9 @@
 #define MAX_OBJECTS 100
 
 typedef struct {
-	Tin_Body *body;
-	Model    *model;
-	Tin_Vec3  color;
+	Tin_BodyID bodyID;
+	Model     *model;
+	Tin_Vec3   color;
 } Object;
 
 Tin_Scene scene;
@@ -231,10 +231,10 @@ draw_objects(void)
 	for (int o = 0; o < num_objects; o++) {
 		const Object *obj = &objects[o];
 		Tin_Vec3 color = obj->color;
-		if (tin_island_find(obj->body)->islandStable && obj->body->invMass != 0.0) {
+		if (scene.bodyTable[tin_island_find(&scene, obj->bodyID)].islandStable && scene.bodyTable[obj->bodyID].invMass != 0.0) {
 			color = tin_saxpy_v3(0.5, color, TIN_VEC3(0.5, 0.5, 0.5));
 		}
-		render_draw_model(obj->model, &obj->body->transform, color);
+		render_draw_model(obj->model, &scene.bodyTable[obj->bodyID].transform, color);
 	}
 }
 
@@ -291,20 +291,22 @@ main(void)
 	};
 	*/
 
-	Tin_Body *body2 = tin_add_body(&scene, &cube_shape, 1.0 / 3.0);
+	Tin_BodyID bodyID2 = tin_add_body(&scene, &cube_shape, 1.0 / 3.0);
+	Tin_Body *body2 = &scene.bodyTable[bodyID2];
 	body2->transform.translation = TIN_VEC3(0.0, -1.0, 0.0);
 	body2->velocity = TIN_VEC3(-3, 1, 0);
 	objects[num_objects++] = (Object){
-		body2,
+		bodyID2,
 		&cube_model,
 		{{ 1.0f, 0.5f, 0.5f }}
 	};
 
-	Tin_Body *body3 = tin_add_body(&scene, &cube_shape, 0.0);
+	Tin_BodyID bodyID3 = tin_add_body(&scene, &cube_shape, 0.0);
+	Tin_Body *body3 = &scene.bodyTable[bodyID3];
 	body3->transform.translation = TIN_VEC3(0.0, -23.0, 0.0);
 	body3->transform.scale = 20.0;
 	objects[num_objects++] = (Object){
-		body3,
+		bodyID3,
 		&cube_model,
 		{{ 1.0f, 1.0f, 1.0f }}
 	};
@@ -321,13 +323,14 @@ main(void)
 					printf("Cannot spawn box: too many objects already present.\n");
 				} else {
 					Tin_Vec3 forward = {{ -cam->rotation[6], -cam->rotation[7], -cam->rotation[8] }};
-					Tin_Body *body = tin_add_body(&scene, &cube_shape, 1.0 / 1.0);
+					Tin_BodyID bodyID = tin_add_body(&scene, &cube_shape, 1.0 / 1.0);
+					Tin_Body *body = &scene.bodyTable[bodyID];
 					memcpy(body->transform.rotation, cam->rotation, sizeof cam->rotation);
 					body->transform.translation = tin_saxpy_v3(1.0, forward, cam->position);
 					body->transform.scale = 0.2;
 					body->velocity = tin_scale_v3(5.0, forward);
 					objects[num_objects++] = (Object) {
-						body,
+						bodyID,
 						&cube_model,
 						{{ 0.5f, 0.5f, 1.0f }}
 					};

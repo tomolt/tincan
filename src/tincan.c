@@ -1092,25 +1092,25 @@ tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB)
 
 /* === Island Detection & Freezing === :island: */
 
-Tin_Body *
-tin_island_find(Tin_Body *body)
+Tin_BodyID
+tin_island_find(Tin_Scene *scene, Tin_BodyID bodyID)
 {
-	Tin_Body *island = body;
-	while (island->island != island) {
-		island = island->island;
+	Tin_BodyID islandID = bodyID;
+	while (scene->bodyTable[islandID].islandID != islandID) {
+		islandID = scene->bodyTable[islandID].islandID;
 	}
-	if (body->island != island) {
-		body->island = island;
+	if (scene->bodyTable[bodyID].islandID != islandID) {
+		scene->bodyTable[bodyID].islandID = islandID;
 	}
-	return island;
+	return islandID;
 }
 
 void
-tin_island_union(Tin_Body *body1, Tin_Body *body2)
+tin_island_union(Tin_Scene *scene, Tin_BodyID bodyID1, Tin_BodyID bodyID2)
 {
-	body1 = tin_island_find(body1);
-	body2 = tin_island_find(body2);
-	body2->island = body1;
+	bodyID1 = tin_island_find(scene, bodyID1);
+	bodyID2 = tin_island_find(scene, bodyID2);
+	scene->bodyTable[bodyID2].islandID = bodyID1;
 }
 
 void
@@ -1119,7 +1119,7 @@ tin_build_islands(Tin_Scene *scene)
 	for (Tin_BodyID i = 0; i < scene->bodyTableCapac; i++) {
 		if (!scene->bodyOccupied[i]) continue;
 		Tin_Body *body = &scene->bodyTable[i];
-		body->island = body;
+		body->islandID = i;
 		body->islandStable = true;
 	}
 
@@ -1128,7 +1128,7 @@ tin_build_islands(Tin_Scene *scene)
 		Tin_Body *body1 = &scene->bodyTable[arbiter->bodyID1];
 		Tin_Body *body2 = &scene->bodyTable[arbiter->bodyID2];
 		if (body1->invMass != 0.0 && body2->invMass != 0.0) {
-			tin_island_union(body1, body2);
+			tin_island_union(scene, arbiter->bodyID1, arbiter->bodyID2);
 		}
 	}
 
@@ -1136,8 +1136,8 @@ tin_build_islands(Tin_Scene *scene)
 		if (!scene->bodyOccupied[i]) continue;
 		Tin_Body *body = &scene->bodyTable[i];
 		if (body->restCounter >= 5 || body->invMass == 0.0) continue;
-		Tin_Body *island = tin_island_find(body);
-		island->islandStable = false;
+		Tin_BodyID islandID = tin_island_find(scene, i);
+		scene->bodyTable[islandID].islandStable = false;
 	}
 }
 
@@ -1292,7 +1292,7 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	for (Tin_BodyID i = 0; i < scene->bodyTableCapac; i++) {
 		if (!scene->bodyOccupied[i]) continue;
 		Tin_Body *body = &scene->bodyTable[i];
-		if (!tin_island_find(body)->islandStable) {
+		if (!scene->bodyTable[tin_island_find(scene, i)].islandStable) {
 			body->velocity = tin_saxpy_v3(dt, TIN_VEC3(0.0, -9.0, 0.0), body->velocity);
 		}
 	}
@@ -1302,11 +1302,8 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	scene->numArbiters = 0;
 	for (size_t i = 0; i < oldNumArbiters; i++) {
 		Tin_Arbiter *arbiter = &scene->arbiters[i];
-		Tin_Body *body1 = &scene->bodyTable[arbiter->bodyID1];
-		Tin_Body *body2 = &scene->bodyTable[arbiter->bodyID2];
-
-		if (tin_island_find(body1)->islandStable) {
-			if (tin_island_find(body2)->islandStable) {
+		if (scene->bodyTable[tin_island_find(scene, arbiter->bodyID1)].islandStable) {
+			if (scene->bodyTable[tin_island_find(scene, arbiter->bodyID2)].islandStable) {
 				continue;
 			}
 		}
@@ -1396,7 +1393,7 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	if (timings) timings[5] += stopTime - startTime;
 }
 
-Tin_Body *
+Tin_BodyID
 tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 {
 	if (scene->freeBodyID == scene->bodyTableCapac) {
@@ -1428,7 +1425,7 @@ tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass)
 	body->shape = shape;
 	body->invMass = invMass;
 	tin_sweep_prune_add_body(scene->sweepPrune, bodyID);
-	return body;
+	return bodyID;
 }
 
 void

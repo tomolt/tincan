@@ -126,7 +126,7 @@ struct Tin_Body {
 	Tin_Scalar    invMass;
 	Tin_Scalar    invInertia[3*3];
 	
-	Tin_Body     *island;
+	Tin_BodyID    islandID;
 	int           restCounter;
 	bool          islandStable;
 	
@@ -254,8 +254,8 @@ void tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB);
 
 typedef struct Tin_Scene Tin_Scene;
 
-Tin_Body *tin_island_find(Tin_Body *body);
-void tin_island_union(Tin_Body *body1, Tin_Body *body2);
+Tin_BodyID tin_island_find(Tin_Scene *scene, Tin_BodyID bodyID);
+void tin_island_union(Tin_Scene *scene, Tin_BodyID bodyID1, Tin_BodyID bodyID2);
 void tin_build_islands(Tin_Scene *scene);
 
 /* === Scenes / Worlds === :scene: */
@@ -286,8 +286,8 @@ void tin_scene_step(Tin_Scene *scene, Tin_Scalar (*velocities)[6]);
 void tin_integrate(Tin_Scene *scene, Tin_Scalar dt);
 void tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timings[6]);
 
-Tin_Body *tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass);
-void      tin_delete_body(Tin_Scene *scene, Tin_BodyID bodyID);
+Tin_BodyID tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar invMass);
+void       tin_delete_body(Tin_Scene *scene, Tin_BodyID bodyID);
 
 /* === Broadphase === :broad: */
 
