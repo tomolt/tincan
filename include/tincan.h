@@ -12,10 +12,8 @@
 #include <stddef.h>
 #include <float.h>
 
-/**
- * \defgroup allocator Customizable Allocators
- * @{
- */
+/// \defgroup allocator Customizable Allocators
+/// @{
 
 /// Customizable allocator.
 typedef struct {
@@ -24,12 +22,10 @@ typedef struct {
 	void (*free)(void *userPointer, void *memoryPointer);
 } Tin_Allocator;
 
-/** @} */
+/// @}
 
-/**
- * \defgroup vector Vector Math
- * @{
- */
+/// \defgroup vector Vector Math
+/// @{
 
 /// An epsilon value for the Tin_Scalar type.
 #define TIN_EPSILON FLT_EPSILON
@@ -64,36 +60,33 @@ Tin_Vec3 tin_hadamard_v3(Tin_Vec3 a, Tin_Vec3 b);
 
 void tin_axis_angle_to_matrix(Tin_Vec3 axis, Tin_Scalar angle, Tin_Scalar matrix[3*3]);
 void tin_m3_times_m3(Tin_Scalar result[3*3], const Tin_Scalar matrixA[3*3], const Tin_Scalar matrixB[3*3]);
+Tin_Vec3 tin_v3_times_m3(Tin_Vec3 vector, const Tin_Scalar matrix[3*3]);
 void tin_m3_times_m3_transposed(Tin_Scalar result[3*3], const Tin_Scalar matrixA[3*3], const Tin_Scalar matrixB[3*3]);
 Tin_Vec3 tin_m3_times_v3(const Tin_Scalar matrix[3*3], Tin_Vec3 vector);
 
 Tin_Vec3   tin_gram_schmidt(Tin_Vec3 fixed, Tin_Vec3 var);
 Tin_Scalar tin_prlgram_area(Tin_Vec3 e1, Tin_Vec3 e2);
 
-/** @} */
-
-/**
- * \defgroup transform Transforms
- * @{
- */
-
+/// Position, orientation, and scale in 3D space.
 typedef struct {
-	Tin_Scalar rotation[3*3];
-	Tin_Vec3   translation;
-	Tin_Scalar scale;
+	Tin_Scalar rotation[3*3]; ///< Rotation matrix, in column-major order
+	Tin_Vec3   translation; ///< Translation relative to origin
+	Tin_Scalar scale; ///< Uniform scale factor
 } Tin_Transform;
 
+/// Transform a point in space.
 Tin_Vec3 tin_fwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec);
+/// Transform a direction vector.
 Tin_Vec3 tin_fwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
+/// Apply inverse transform to a point in space.
 Tin_Vec3 tin_bwtrf_point(const Tin_Transform *transform, Tin_Vec3 vec);
+/// Apply inverse transform to a direction vector.
 Tin_Vec3 tin_bwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
 
-/** @} */
+/// @}
 
-/**
- * \defgroup polytope Polytopes
- * @{
- */
+/// \defgroup polytope Polytopes
+/// @{
 
 typedef struct {
 	Tin_Vec3  *vertices;
@@ -106,12 +99,10 @@ typedef struct {
 
 Tin_Vec3 tin_polytope_support(const void *geometry, Tin_Vec3 dir);
 
-/** @} */
+/// @}
 
-/**
- * \defgroup shape Collision Shapes
- * @{
- */
+/// \defgroup shape Collision Shapes
+/// @{
 
 #define TIN_SPHERE   's'
 #define TIN_POLYTOPE 'p'
@@ -127,12 +118,10 @@ typedef struct {
 
 void tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax);
 
-/** @} */
+/// @}
 
-/**
- * \defgroup body Rigid Bodies
- * @{
- */
+/// \defgroup body Rigid Bodies
+/// @{
 
 /// A numerical ID identifying a rigid body within a scene.
 typedef uint32_t Tin_BodyID;
@@ -169,12 +158,10 @@ typedef struct Tin_Body {
 	Tin_Vec3      aabbMax;
 } Tin_Body;
 
-/** @} */
+/// @}
 
-/**
- * \defgroup minkowski Minkowski Sum
- * @{
- */
+/// \defgroup minkowski Minkowski Sum
+/// @{
 
 /// Implicit Minkowski Sum (difference) of two transformed polytopes.
 typedef struct {
@@ -206,12 +193,10 @@ int tin_construct_portal(const void *geometry, Tin_SupportFunc support,
 void tin_refine_portal  (const void *geometry, Tin_SupportFunc support,
 	const Tin_Ray *r, Tin_Portal *p);
 
-/** @} */
+/// @}
 
-/**
- * \defgroup contact Contact Points
- * @{
- */
+/// \defgroup contact Contact Points
+/// @{
 
 #define TIN_MAX_CONTACTS 4
 
@@ -269,12 +254,10 @@ typedef struct Tin_Scene Tin_Scene;
 
 void tin_arbiter_prestep(Tin_Scene *scene, Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
 
-/** @} */
+/// @}
 
-/**
- * \defgroup pairtable Pair-Indexed Hashtable
- * @{
- */
+/// \defgroup pairtable Pair-Indexed Hashtable
+/// @{
 
 typedef struct {
 	size_t   elemLow;
@@ -302,12 +285,10 @@ bool tin_find_pair(const Tin_PairTable *table, size_t elemA, size_t elemB, void 
 void tin_insert_pair(Tin_PairTable *table, size_t elemA, size_t elemB, void *payload);
 void tin_delete_pair(Tin_PairTable *table, size_t elemA, size_t elemB);
 
-/** @} */
+/// @}
 
-/**
- * \defgroup island Island Detection & Freezing
- * @{
- */
+/// \defgroup island Island Detection & Freezing
+/// @{
 
 typedef struct Tin_Scene Tin_Scene;
 
@@ -315,12 +296,10 @@ Tin_BodyID tin_island_find(Tin_Scene *scene, Tin_BodyID bodyID);
 void tin_island_union(Tin_Scene *scene, Tin_BodyID bodyID1, Tin_BodyID bodyID2);
 void tin_build_islands(Tin_Scene *scene);
 
-/** @} */
+/// @}
 
-/**
- * \defgroup scene Scenes
- * @{
- */
+/// \defgroup scene Scenes
+/// @{
 
 typedef struct Tin_SweepPrune Tin_SweepPrune;
 
@@ -368,12 +347,10 @@ Tin_BodyID tin_add_body(Tin_Scene *scene, const Tin_Shape *shape, Tin_Scalar inv
  */
 void       tin_delete_body(Tin_Scene *scene, Tin_BodyID bodyID);
 
-/** @} */
+/// @}
 
-/**
- * \defgroup broadphase Broadphase Collision Detection
- * @{
- */
+/// \defgroup broadphase Broadphase Collision Detection
+/// @{
 
 #define TIN_BLOOM_NUM_BITS (1024 * 8)
 
@@ -409,6 +386,6 @@ void tin_sweep_prune_axis(Tin_SweepPrune *sap, int axisIdx, const unsigned *bloo
 void tin_sweep_prune(Tin_SweepPrune *sap,
 	Tin_BodyID **collidersOut, size_t *numCollidersOut);
 
-/** @} */
+/// @}
 
 #endif
