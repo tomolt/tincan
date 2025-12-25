@@ -15,3 +15,5 @@ gmon.out
 
 cachegrind.out.*
 dhat.out.*
+
+html/
