@@ -9,28 +9,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stddef.h> /* for offsetof */
+#include <stddef.h>
 #include <float.h>
-
-/* === Linked List === :list: */
-
-typedef struct Tin_List Tin_List;
-
-struct Tin_List {
-	Tin_List *next;
-	Tin_List *prev;
-};
-
-#define TIN_LIST_LINK(node1, node2) do { (node1).next = &(node2); (node2).prev = &(node1); } while (0)
-#define TIN_LIST_INIT(list) TIN_LIST_LINK(list, list)
-#define TIN_CONTAINER_OF(ptr, type, member) ((type *)((char *)(ptr) - offsetof(type, member)))
-#define TIN_FOR_RANGE(elem, start, end, type, member)						\
-	type *elem;									\
-	Tin_List *_node;								\
-	for (elem = TIN_CONTAINER_OF(_node = (start).next, type, member);		\
-	     _node != &(end);								\
-	     elem = TIN_CONTAINER_OF(_node = _node->next, type, member))
-#define TIN_FOR_EACH(elem, list, type, member) TIN_FOR_RANGE(elem, list, list, type, member)
 
 /* === Customizable Allocators === :alloc: */
 
