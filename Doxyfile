@@ -993,6 +993,8 @@ WARN_LOGFILE           =
 
 INPUT                  = src/tincan.c \
                          src/tin_broadphase.c \
+                         src/tin_collision.c \
+                         src/tin_mpr.c \
                          src/tin_pairtable.c \
                          src/tin_vector.c \
                          include/tincan.h

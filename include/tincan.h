@@ -104,10 +104,24 @@ Tin_Vec3 tin_polytope_support(const void *geometry, Tin_Vec3 dir);
 /// \defgroup shape Collision Shapes
 /// @{
 
+#define TIN_MAKE_SHAPE_CODE(str) ((str)[0] | ((str)[1] << 8) | ((str)[2] << 16) | ((str)[3] << 24))
+
+#define TIN_SHAPE_CODE_SPHERE   TIN_MAKE_SHAPE_CODE("SPHE")
+#define TIN_SHAPE_CODE_POLYTOPE TIN_MAKE_SHAPE_CODE("PTOP")
+
+typedef uint32_t Tin_ShapeCode;
+
+typedef struct Tin_ShapeClass {
+	Tin_ShapeCode code;
+	void (*aabb)(const void *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax);
+	bool (*intersect)(const void *shape, const Tin_Transform *transform, const void *otherShape, const Tin_Transform *otherTransform);
+} Tin_ShapeClass;
+
 #define TIN_SPHERE   's'
 #define TIN_POLYTOPE 'p'
 
 typedef struct {
+	Tin_ShapeClass *vtable;
 	Tin_Vec3   invInertia;
 	Tin_Scalar radius;
 	int        kind;
@@ -117,6 +131,9 @@ typedef struct {
 } Tin_Shape;
 
 void tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax);
+
+extern const Tin_ShapeClass tin_shape_class_sphere;
+extern const Tin_ShapeClass tin_shape_class_polytope;
 
 /// @}
 
@@ -175,6 +192,8 @@ Tin_Vec3 tin_polysum_support(const void *geometry, Tin_Vec3 dir);
 
 /* === Minkowski Portal Refinement === :mpr: */
 
+typedef struct Tin_Arbiter Tin_Arbiter;
+
 /// A ray in 3D space.
 typedef struct {
 	Tin_Vec3 origin;
@@ -192,6 +211,20 @@ int tin_construct_portal(const void *geometry, Tin_SupportFunc support,
 	const Tin_Ray *r, Tin_Portal *p);
 void tin_refine_portal  (const void *geometry, Tin_SupportFunc support,
 	const Tin_Ray *r, Tin_Portal *p);
+bool tin_intersect(
+	const Tin_Polytope *pa, const Tin_Transform *ta,
+	const Tin_Polytope *pb, const Tin_Transform *tb,
+	Tin_Vec3 *normalOut);
+void tin_fill_arbiter(
+	const Tin_Transform *ta, const Tin_Transform *tb,
+	int faceA, int faceB,
+	Tin_Vec3 refNormal, Tin_Scalar refBase,
+	Tin_Vec3 *manifold, int count,
+	Tin_Arbiter *arbiter);
+int tin_polytope_collide(
+	const Tin_Polytope *pa, const Tin_Transform *ta,
+	const Tin_Polytope *pb, const Tin_Transform *tb,
+	Tin_Arbiter *arbiter);
 
 /// @}
 
@@ -237,7 +270,7 @@ typedef struct {
 } Tin_CachedContact;
 */
 
-typedef struct {
+typedef struct Tin_Arbiter {
 	int bodyID1;
 	int bodyID2;
 	int face1;
@@ -253,6 +286,11 @@ typedef struct {
 typedef struct Tin_Scene Tin_Scene;
 
 void tin_arbiter_prestep(Tin_Scene *scene, Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
+
+int tin_clip_manifold_against_plane(const Tin_Vec3 *points, int count, Tin_Vec3 normal, Tin_Scalar base, Tin_Vec3 *newPoints);
+int tin_clip_manifolds(const Tin_Vec3 *pointsA, int countA, const Tin_Vec3 *pointsB, int countB, Tin_Vec3 perpendicular, Tin_Vec3 *newPoints);
+int tin_incident_face(const Tin_Polytope *polytope, Tin_Vec3 dir);
+int tin_reduce_manifold(Tin_Vec3 *points, int count);
 
 /// @}
 
