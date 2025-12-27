@@ -5,73 +5,10 @@
 /* Our matrices are column major */
 #define M3(matrix,row,column) (matrix[(row)+3*(column)])
 
-Tin_Vec3
-tin_neg_v3(Tin_Vec3 x)
-{
-	return (Tin_Vec3) {{ -x.c[0], -x.c[1], -x.c[2] }};
-}
-
-Tin_Vec3
-tin_add_v3(Tin_Vec3 a, Tin_Vec3 b)
-{
-	return (Tin_Vec3) {{ a.c[0]+b.c[0], a.c[1]+b.c[1], a.c[2]+b.c[2] }};
-}
-
-Tin_Vec3
-tin_sub_v3(Tin_Vec3 a, Tin_Vec3 b)
-{
-	return (Tin_Vec3) {{ a.c[0]-b.c[0], a.c[1]-b.c[1], a.c[2]-b.c[2] }};
-}
-
-Tin_Vec3
-tin_scale_v3(Tin_Scalar a, Tin_Vec3 x)
-{
-	return (Tin_Vec3) {{ a*x.c[0], a*x.c[1], a*x.c[2] }};
-}
-
-Tin_Vec3
-tin_saxpy_v3(Tin_Scalar a, Tin_Vec3 x, Tin_Vec3 y)
-{
-	return tin_add_v3(tin_scale_v3(a, x), y);
-}
-
-Tin_Vec3
-tin_cross_v3(Tin_Vec3 a, Tin_Vec3 b)
-{
-	Tin_Vec3 c;
-	c.c[0] = a.c[1] * b.c[2] - a.c[2] * b.c[1];
-	c.c[1] = a.c[2] * b.c[0] - a.c[0] * b.c[2];
-	c.c[2] = a.c[0] * b.c[1] - a.c[1] * b.c[0];
-	return c;
-}
-
-Tin_Scalar
-tin_dot_v3(Tin_Vec3 a, Tin_Vec3 b)
-{
-	return a.c[0]*b.c[0] + a.c[1]*b.c[1] + a.c[2]*b.c[2];
-}
-
 Tin_Scalar
 tin_length_v3(Tin_Vec3 v)
 {
 	return sqrt(tin_dot_v3(v, v));
-}
-
-Tin_Vec3
-tin_normalize_v3(Tin_Vec3 v)
-{
-	Tin_Scalar norm = tin_length_v3(v);
-	if (norm > 0.0f) {
-		return tin_scale_v3(1.0f / norm, v);
-	} else {
-		return v;
-	}
-}
-
-Tin_Vec3
-tin_hadamard_v3(Tin_Vec3 a, Tin_Vec3 b)
-{
-	return (Tin_Vec3) {{ a.c[0]*b.c[0], a.c[1]*b.c[1], a.c[2]*b.c[2] }};
 }
 
 void

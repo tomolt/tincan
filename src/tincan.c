@@ -312,6 +312,7 @@ tin_arbiter_prestep(Tin_Scene *scene, Tin_Arbiter *arbiter, Tin_Scalar (*velocit
 void
 tin_arbiter_warm_start(Tin_Scalar (*velocities)[6], Tin_Arbiter *arbiter, const Tin_Arbiter *oldArbiter)
 {
+	const Tin_Scalar warmStartFactor = 0.8;
 	const Tin_Scalar maxDistanceSq = 0.01;
 	if (!(arbiter->face1 == oldArbiter->face1 && arbiter->face2 == oldArbiter->face2)) {
 		return;
@@ -327,11 +328,11 @@ tin_arbiter_warm_start(Tin_Scalar (*velocities)[6], Tin_Arbiter *arbiter, const 
 			Tin_Scalar dist2Sq = tin_dot_v3(diff2, diff2);
 			if (dist1Sq <= maxDistanceSq && dist2Sq <= maxDistanceSq) {
 				Tin_Scalar normalProj = tin_alignof_v12(contact->normalConstraint.jacobian, oldContact->normalConstraint.jacobian);
-				contact->normalConstraint.accumMagnitude = 0.8 * normalProj * oldContact->normalConstraint.accumMagnitude;
+				contact->normalConstraint.accumMagnitude = warmStartFactor * normalProj * oldContact->normalConstraint.accumMagnitude;
 				Tin_Scalar tangentProj1 = tin_alignof_v12(contact->tangentConstraint1.jacobian, oldContact->tangentConstraint1.jacobian);
-				contact->tangentConstraint1.accumMagnitude = 0.8 * tangentProj1 * oldContact->tangentConstraint1.accumMagnitude;
+				contact->tangentConstraint1.accumMagnitude = warmStartFactor * tangentProj1 * oldContact->tangentConstraint1.accumMagnitude;
 				Tin_Scalar tangentProj2 = tin_alignof_v12(contact->tangentConstraint2.jacobian, oldContact->tangentConstraint2.jacobian);
-				contact->tangentConstraint2.accumMagnitude = 0.8 * tangentProj2 * oldContact->tangentConstraint2.accumMagnitude;
+				contact->tangentConstraint2.accumMagnitude = warmStartFactor * tangentProj2 * oldContact->tangentConstraint2.accumMagnitude;
 
 				tin_apply_impulse(&contact->normalConstraint, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);
 				tin_apply_impulse(&contact->tangentConstraint1, velocities[arbiter->bodyID1], velocities[arbiter->bodyID2]);

@@ -4,6 +4,8 @@
  * All rights reserved
  */
 
+/// \brief The public facing header file of the tincan physics engine
+
 #ifndef TINCAN_PHYSICS_H
 #define TINCAN_PHYSICS_H
 
@@ -11,6 +13,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <float.h>
+
+/// Mark a function as inline.
+#define TIN_INLINE static inline
 
 /// \defgroup allocator Customizable Allocators
 /// @{
@@ -43,21 +48,84 @@ typedef struct Tin_Vec3 {
 #define TIN_VEC3(x, y, z) (Tin_Vec3){{x,y,z}}
 
 /// Invert the direction of a 3D vector.
-Tin_Vec3 tin_neg_v3  (Tin_Vec3 x);
+TIN_INLINE Tin_Vec3
+tin_neg_v3(Tin_Vec3 x) 
+{
+	return TIN_VEC3(-x.c[0], -x.c[1], -x.c[2]);
+}
+
 /// Add two 3D vectors together.
-Tin_Vec3 tin_add_v3  (Tin_Vec3 a, Tin_Vec3 b);
+TIN_INLINE Tin_Vec3
+tin_add_v3(Tin_Vec3 a, Tin_Vec3 b)
+{
+	return TIN_VEC3(a.c[0]+b.c[0], a.c[1]+b.c[1], a.c[2]+b.c[2]);
+}
+
 /// Subtract a 3D vector from another.
-Tin_Vec3 tin_sub_v3  (Tin_Vec3 a, Tin_Vec3 b);
+TIN_INLINE Tin_Vec3
+tin_sub_v3(Tin_Vec3 a, Tin_Vec3 b)
+{
+	return TIN_VEC3(a.c[0]-b.c[0], a.c[1]-b.c[1], a.c[2]-b.c[2]);
+}
+
 /// Scale a 3D vector by a scalar value.
-Tin_Vec3 tin_scale_v3(Tin_Scalar a, Tin_Vec3 x);
-Tin_Vec3 tin_saxpy_v3(Tin_Scalar a, Tin_Vec3 x, Tin_Vec3 y);
+TIN_INLINE Tin_Vec3
+tin_scale_v3(Tin_Scalar a, Tin_Vec3 x)
+{
+	return TIN_VEC3(a*x.c[0], a*x.c[1], a*x.c[2]);
+}
+
+/**
+ * \brief Scale a vector and add it to another vector.
+ *
+ * \param a The scale
+ * \param x The vector to scale
+ * \param y The other vector to add
+ */
+TIN_INLINE Tin_Vec3
+tin_saxpy_v3(Tin_Scalar a, Tin_Vec3 x, Tin_Vec3 y)
+{
+	return tin_add_v3(tin_scale_v3(a, x), y);
+}
+
 /// Calculate the cross product of two 3D vectors.
-Tin_Vec3 tin_cross_v3(Tin_Vec3 a, Tin_Vec3 b);
+TIN_INLINE Tin_Vec3
+tin_cross_v3(Tin_Vec3 a, Tin_Vec3 b)
+{
+	Tin_Vec3 c;
+	c.c[0] = a.c[1] * b.c[2] - a.c[2] * b.c[1];
+	c.c[1] = a.c[2] * b.c[0] - a.c[0] * b.c[2];
+	c.c[2] = a.c[0] * b.c[1] - a.c[1] * b.c[0];
+	return c;
+}
+
 /// Calculate the dot product of two 3D vectors.
-Tin_Scalar tin_dot_v3(Tin_Vec3 a, Tin_Vec3 b);
+TIN_INLINE Tin_Scalar
+tin_dot_v3(Tin_Vec3 a, Tin_Vec3 b)
+{
+	return a.c[0]*b.c[0] + a.c[1]*b.c[1] + a.c[2]*b.c[2];
+}
+
+/// Compute the hadamard (component-wise) product of two vectors.
+TIN_INLINE Tin_Vec3
+tin_hadamard_v3(Tin_Vec3 a, Tin_Vec3 b)
+{
+	return TIN_VEC3(a.c[0]*b.c[0], a.c[1]*b.c[1], a.c[2]*b.c[2]);
+}
+
+/// Compute the Euclidean length of a vector.
 Tin_Scalar tin_length_v3(Tin_Vec3 v);
-Tin_Vec3 tin_normalize_v3(Tin_Vec3 v);
-Tin_Vec3 tin_hadamard_v3(Tin_Vec3 a, Tin_Vec3 b);
+
+TIN_INLINE Tin_Vec3
+tin_normalize_v3(Tin_Vec3 v)
+{
+	Tin_Scalar norm = tin_length_v3(v);
+	if (norm > 0.0f) {
+		return tin_scale_v3(1.0f / norm, v);
+	} else {
+		return v;
+	}
+}
 
 void tin_axis_angle_to_matrix(Tin_Vec3 axis, Tin_Scalar angle, Tin_Scalar matrix[3*3]);
 void tin_m3_times_m3(Tin_Scalar result[3*3], const Tin_Scalar matrixA[3*3], const Tin_Scalar matrixB[3*3]);
@@ -86,36 +154,27 @@ Tin_Vec3 tin_bwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
 
 /// @}
 
-/// \defgroup polytope Polytopes
-/// @{
-
-typedef struct Tin_ShapeClass Tin_ShapeClass;
-
-typedef struct {
-	const Tin_ShapeClass *vtable;
-	Tin_Vec3   invInertia;
-	Tin_Scalar boundRadius;
-	Tin_Vec3  *vertices;
-	int       *faceIndices;
-	int       *faceOffsets;
-	Tin_Vec3  *faceNormals;
-	int        numVertices;
-	int        numFaces;
-} Tin_Polytope;
-
-Tin_Vec3 tin_polytope_support(const void *geometry, Tin_Vec3 dir);
-
-/// @}
-
 /// \defgroup shape Collision Shapes
 /// @{
 
-#define TIN_SHAPE_CODE_SPHERE   0x53504845u // 'SPHE' in little-endian ASCII
-#define TIN_SHAPE_CODE_POLYTOPE 0x50544F50u // 'PTOP' in little-endian ASCII
+/**
+ * \brief Identifies the sphere shape class.
+ *
+ * The code is 'SPHE' in little-endian ASCII.
+ */
+#define TIN_SHAPE_CODE_SPHERE   0x53504845u
+
+/**
+ * \brief Identifies the polytope shape class.
+ *
+ * The code is 'HULL' in little-endian ASCII.
+ */
+#define TIN_SHAPE_CODE_POLYTOPE 0x48554C4C
 
 typedef uint32_t Tin_ShapeCode;
 typedef struct Tin_Arbiter Tin_Arbiter;
 
+/// Describes a 'class' of shapes.
 typedef struct Tin_ShapeClass {
 	Tin_ShapeCode code;
 	Tin_Vec3 (*get_inv_inertia)(const void *shape);
@@ -132,10 +191,25 @@ typedef struct {
 	Tin_Scalar radius;
 } Tin_Sphere;
 
-void tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax);
+typedef struct {
+	const Tin_ShapeClass *vtable;
+	Tin_Vec3   invInertia;
+	Tin_Scalar boundRadius;
+	Tin_Vec3  *vertices;
+	int       *faceIndices;
+	int       *faceOffsets;
+	Tin_Vec3  *faceNormals;
+	int        numVertices;
+	int        numFaces;
+} Tin_Polytope;
 
+/// The shape vtable for spheres.
 extern const Tin_ShapeClass tin_shape_sphere;
+
+/// The shape vtable for polytopes.
 extern const Tin_ShapeClass tin_shape_polytope;
+
+Tin_Vec3 tin_polytope_support(const void *geometry, Tin_Vec3 dir);
 
 /// @}
 
@@ -179,8 +253,10 @@ typedef struct Tin_Body {
 
 /// @}
 
-/// \defgroup minkowski Minkowski Sum
+/// \defgroup mpr Minkowski Portal Refinement
 /// @{
+
+typedef struct Tin_Arbiter Tin_Arbiter;
 
 /// Implicit Minkowski Sum (difference) of two transformed polytopes.
 typedef struct {
@@ -191,10 +267,6 @@ typedef struct {
 } Tin_Polysum;
 
 Tin_Vec3 tin_polysum_support(const void *geometry, Tin_Vec3 dir);
-
-/* === Minkowski Portal Refinement === :mpr: */
-
-typedef struct Tin_Arbiter Tin_Arbiter;
 
 /// A ray in 3D space.
 typedef struct {
@@ -217,12 +289,6 @@ bool tin_intersect(
 	const Tin_Polytope *pa, const Tin_Transform *ta,
 	const Tin_Polytope *pb, const Tin_Transform *tb,
 	Tin_Vec3 *normalOut);
-void tin_fill_arbiter(
-	const Tin_Transform *ta, const Tin_Transform *tb,
-	int faceA, int faceB,
-	Tin_Vec3 refNormal, Tin_Scalar refBase,
-	Tin_Vec3 *manifold, int count,
-	Tin_Arbiter *arbiter);
 
 /// @}
 
@@ -268,6 +334,12 @@ typedef struct Tin_Arbiter {
 
 typedef struct Tin_Scene Tin_Scene;
 
+void tin_fill_arbiter(
+	const Tin_Transform *ta, const Tin_Transform *tb,
+	int faceA, int faceB,
+	Tin_Vec3 refNormal, Tin_Scalar refBase,
+	Tin_Vec3 *manifold, int count,
+	Tin_Arbiter *arbiter);
 void tin_arbiter_prestep(Tin_Scene *scene, Tin_Arbiter *arbiter, Tin_Scalar (*velocities)[6], Tin_Scalar invDt);
 
 int tin_clip_manifold_against_plane(const Tin_Vec3 *points, int count, Tin_Vec3 normal, Tin_Scalar base, Tin_Vec3 *newPoints);
@@ -373,7 +445,7 @@ void       tin_delete_body(Tin_Scene *scene, Tin_BodyID bodyID);
 /// \defgroup broadphase Broadphase Collision Detection
 /// @{
 
-#define TIN_BLOOM_NUM_BITS (1024 * 8)
+#define TIN_BLOOM_NUM_BITS (16 * 1024 * 8)
 
 void tin_bloom_hash(uintptr_t key1, uintptr_t key2, unsigned hashes[3]);
 void tin_bloom_insert(unsigned *bloom, uintptr_t key1, uintptr_t key2);
