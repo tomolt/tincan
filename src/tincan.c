@@ -29,171 +29,40 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
-/* === Polytopes === :poly: */
-
-Tin_Vec3
-tin_polytope_support(const void *geometry, Tin_Vec3 dir)
+Tin_Scalar
+tin_dot_v12(const Tin_Scalar a[12], const Tin_Scalar b[12])
 {
-	const Tin_Polytope *polytope = geometry;
-	Tin_Scalar bestScore = -INFINITY;
-	int bestIdx = -1;
-	for (int idx = 0; idx < polytope->numVertices; idx++) {
-		Tin_Scalar score = tin_dot_v3(polytope->vertices[idx], dir);
-		if (score > bestScore) {
-			bestScore = score;
-			bestIdx   = idx;
-		}
+#if TIN_HAS_SSE2
+	float f[4];
+	__m128 x0, x1, x2;
+	x0 = _mm_mul_ps(_mm_loadu_ps(&a[0]), _mm_loadu_ps(&b[0]));
+	x1 = _mm_mul_ps(_mm_loadu_ps(&a[4]), _mm_loadu_ps(&b[4]));
+	x2 = _mm_mul_ps(_mm_loadu_ps(&a[8]), _mm_loadu_ps(&b[8]));
+	x0 = _mm_add_ps(x0, x1);
+	x0 = _mm_add_ps(x0, x2);
+	_mm_store_ps(f, x0);
+	return (f[0] + f[1]) + (f[2] + f[3]);
+#else
+	Tin_Scalar sum = 0.0;
+	for (int i = 0; i < 12; i++) {
+		sum += a[i] * b[i];
 	}
-	return polytope->vertices[bestIdx];
-}
-
-Tin_Vec3
-tin_polysum_support(const void *geometry, Tin_Vec3 dir)
-{
-	const Tin_Polysum *s = geometry;
-
-	Tin_Vec3 former_dir = tin_bwtrf_dir(s->transform1, dir);
-	Tin_Vec3 relTo1 = tin_polytope_support(s->polytope1, former_dir);
-	Tin_Vec3 former_abs = tin_fwtrf_point(s->transform1, relTo1);
-
-	Tin_Vec3 latter_dir = tin_bwtrf_dir(s->transform2, tin_neg_v3(dir));
-	Tin_Vec3 relTo2 = tin_polytope_support(s->polytope2, latter_dir);
-	Tin_Vec3 latter_abs = tin_fwtrf_point(s->transform2, relTo2);
-
-	return tin_sub_v3(former_abs, latter_abs);
-}
-
-#if 0
-/* === Shapes === :shape: */
-
-void
-tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax)
-{
-	switch (shape->kind) {
-	case TIN_SPHERE:
-		*aabbMin = (Tin_Vec3){{ -1.0, -1.0, -1.0 }};
-		*aabbMax = (Tin_Vec3){{  1.0,  1.0,  1.0 }};
-		*aabbMin = tin_saxpy_v3(transform->scale, *aabbMin, transform->translation);
-		*aabbMax = tin_saxpy_v3(transform->scale, *aabbMax, transform->translation);
-		break;
-
-	case TIN_POLYTOPE:
-		// TODO reuse back-transformed cardinal direction vectors
-		aabbMin->c[0] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{ -1.0, 0.0, 0.0 }})).c[0];
-		aabbMin->c[1] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  0.0,-1.0, 0.0 }})).c[1];
-		aabbMin->c[2] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  0.0, 0.0,-1.0 }})).c[2];
-		aabbMax->c[0] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  1.0, 0.0, 0.0 }})).c[0];
-		aabbMax->c[1] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  0.0, 1.0, 0.0 }})).c[1];
-		aabbMax->c[2] = tin_polytope_support(&shape->polytope, tin_bwtrf_dir(transform, (Tin_Vec3){{  0.0, 0.0, 1.0 }})).c[2];
-		*aabbMin = tin_fwtrf_point(transform, *aabbMin);
-		*aabbMax = tin_fwtrf_point(transform, *aabbMax);
-		break;
-	
-	default:
-		abort();
-	}
-}
+	return sum;
 #endif
+}
+
+Tin_Scalar
+tin_alignof_v12(const Tin_Scalar a[12], const Tin_Scalar b[12])
+{
+	Tin_Scalar aSq = tin_dot_v12(a, a);
+	Tin_Scalar bSq = tin_dot_v12(b, b);
+	Tin_Scalar abLen = sqrt(aSq * bSq);
+	Tin_Scalar proj = tin_dot_v12(a, b);
+	Tin_Scalar projScaled = abLen <= TIN_EPSILON ? 0.0 : (proj / abLen);
+	return MAX(projScaled, 0.0);
+}
 
 /* === Contact Points === :contact: */
-
-int
-tin_clip_manifold_against_plane(const Tin_Vec3 *points, int count, Tin_Vec3 normal, Tin_Scalar base, Tin_Vec3 *newPoints)
-{
-	int newCount = 0;
-	int j = count - 1;
-	Tin_Scalar pj = tin_dot_v3(normal, points[j]) - base;
-	for (int i = 0; i < count; i++) {
-		Tin_Scalar pi = tin_dot_v3(normal, points[i]) - base;
-		if (pi <= 0.0) {
-			if (!(pj <= 0.0)) {
-				Tin_Vec3 dir = tin_sub_v3(points[i], points[j]);
-				Tin_Scalar t = (base - tin_dot_v3(normal, points[j])) / tin_dot_v3(normal, dir);
-				Tin_Vec3 x = tin_saxpy_v3(t, dir, points[j]);
-				newPoints[newCount++] = x;
-			}
-			newPoints[newCount++] = points[i];
-		} else {
-			if (pj <= 0.0) {
-				Tin_Vec3 dir = tin_sub_v3(points[i], points[j]);
-				Tin_Scalar t = (base - tin_dot_v3(normal, points[j])) / tin_dot_v3(normal, dir);
-				Tin_Vec3 x = tin_saxpy_v3(t, dir, points[j]);
-				newPoints[newCount++] = x;
-			}
-		}
-		j = i;
-		pj = pi;
-	}
-	return newCount;
-}
-
-int
-tin_clip_manifolds(const Tin_Vec3 *pointsA, int countA, const Tin_Vec3 *pointsB, int countB, Tin_Vec3 perpendicular, Tin_Vec3 *newPoints)
-{
-	// Clip planes point outwards. Polytope faces need to be wound counter-clockwise.
-	int newCount = countB;
-	memcpy(newPoints, pointsB, newCount * sizeof *newPoints);
-	int j = countA - 1;
-	for (int i = 0; i < countA; i++) {
-		if (newCount == 0) break;
-		Tin_Vec3 edge = tin_sub_v3(pointsA[i], pointsA[j]);
-		Tin_Vec3 normal = tin_cross_v3(edge, perpendicular);
-		normal = tin_normalize_v3(normal);
-		Tin_Scalar base = tin_dot_v3(normal, pointsA[i]);
-		Tin_Vec3 buffer[32];
-		newCount = tin_clip_manifold_against_plane(newPoints, newCount, normal, base, buffer);
-		memcpy(newPoints, buffer, newCount * sizeof *newPoints);
-		j = i;
-	}
-	return newCount;
-}
-
-int
-tin_incident_face(const Tin_Polytope *polytope, Tin_Vec3 dir)
-{
-	int bestFace = -1;
-	Tin_Scalar bestScore = -INFINITY;
-	for (int f = 0; f < polytope->numFaces; f++) {
-		Tin_Scalar score = tin_dot_v3(dir, polytope->faceNormals[f]);
-		if (score > bestScore) {
-			bestFace = f;
-			bestScore = score;
-		}
-	}
-	return bestFace;
-}
-
-int
-tin_reduce_manifold(Tin_Vec3 *points, int count)
-{
-	assert(count > 0);
-	int idx = -1;
-	Tin_Scalar bestScore = INFINITY;
-	for (int i = 0; i < count; i++) {
-		int j1 = i - 1;
-		if (j1 < 0) j1 = count - 1;
-		int j2 = i + 1;
-		if (j2 >= count) j2 = 0;
-		Tin_Vec3 e1 = tin_sub_v3(points[i], points[j1]);
-		Tin_Vec3 e2 = tin_sub_v3(points[j2], points[i]);
-		Tin_Scalar score = tin_prlgram_area(e1, e2);
-		// A score of INFINITY is a distinct possibility (e1 = 0),
-		// so we have to make sure that we still pick anybody in that
-		// case.
-		if (score <= bestScore) {
-			idx = i;
-			bestScore = score;
-		}
-	}
-	assert(idx >= 0);
-	assert(idx < count);
-	count -= 1;
-	if (count - idx > 0) {
-		memmove(points + idx, points + idx + 1, (count - idx) * sizeof *points);
-	}
-	return count;
-}
-
 
 void
 tin_fill_arbiter(
@@ -239,84 +108,6 @@ tin_fill_arbiter(
 		}
 	}
 	arbiter->numPenetrating = numPenetrating;
-}
-
-int
-tin_polytope_collide(
-	const Tin_Polytope *pa, const Tin_Transform *ta,
-	const Tin_Polytope *pb, const Tin_Transform *tb,
-	Tin_Arbiter *arbiter)
-{
-	Tin_Vec3 normal;
-	if (!tin_intersect(pa, ta, pb, tb, &normal)) {
-		return 0;
-	}
-
-	// Find a face on polytope A that aligns closely with the collision normal.
-	int faceA = tin_incident_face(pa, tin_bwtrf_dir(ta, normal));
-	Tin_Vec3 pointsA[32];
-	int countA = 0;
-	for (int i = pa->faceOffsets[faceA]; i < pa->faceOffsets[faceA+1]; i++) {
-		int idx = pa->faceIndices[i];
-		pointsA[countA++] = tin_fwtrf_point(ta, pa->vertices[idx]);
-	}
-
-	Tin_Vec3 refNormal = tin_normalize_v3(tin_fwtrf_dir(ta, pa->faceNormals[faceA]));
-	Tin_Scalar refBase = tin_dot_v3(refNormal, pointsA[0]);
-
-	// Find a face on polytope B that aligns closely with the (negated) collision normal.
-	int faceB = tin_incident_face(pb, tin_bwtrf_dir(tb, tin_neg_v3(refNormal)));
-	Tin_Vec3 pointsB[32];
-	int countB = 0;
-	for (int i = pb->faceOffsets[faceB]; i < pb->faceOffsets[faceB+1]; i++) {
-		int idx = pb->faceIndices[i];
-		pointsB[countB++] = tin_fwtrf_point(tb, pb->vertices[idx]);
-	}
-
-	// Clip the faces against each other to create a collision manifold.
-	Tin_Vec3 manifold[32];
-	int count = tin_clip_manifolds(pointsA, countA, pointsB, countB, refNormal, manifold);
-
-	// Simplify the collision manifold.
-	while (count > TIN_MAX_CONTACTS) {
-		count = tin_reduce_manifold(manifold, count);
-	}
-
-	tin_fill_arbiter(ta, tb, faceA, faceB, refNormal, refBase, manifold, count, arbiter);
-
-	return count;
-}
-
-Tin_Scalar
-tin_dot_v12(const Tin_Scalar a[12], const Tin_Scalar b[12])
-{
-#if TIN_HAS_SSE2
-	float f[4];
-	__m128 x0, x1, x2;
-	x0 = _mm_mul_ps(_mm_loadu_ps(&a[0]), _mm_loadu_ps(&b[0]));
-	x1 = _mm_mul_ps(_mm_loadu_ps(&a[4]), _mm_loadu_ps(&b[4]));
-	x2 = _mm_mul_ps(_mm_loadu_ps(&a[8]), _mm_loadu_ps(&b[8]));
-	x0 = _mm_add_ps(x0, x1);
-	x0 = _mm_add_ps(x0, x2);
-	_mm_store_ps(f, x0);
-	return (f[0] + f[1]) + (f[2] + f[3]);
-#else
-	Tin_Scalar sum = 0.0;
-	for (int i = 0; i < 12; i++) {
-		sum += a[i] * b[i];
-	}
-	return sum;
-#endif
-}
-
-Tin_Scalar
-tin_dot_array(Tin_Scalar a[], Tin_Scalar b[], int length)
-{
-	Tin_Scalar sum = 0.0;
-	for (int i = 0; i < length; i++) {
-		sum += a[i] * b[i];
-	}
-	return sum;
 }
 
 void
@@ -516,17 +307,6 @@ tin_arbiter_prestep(Tin_Scene *scene, Tin_Arbiter *arbiter, Tin_Scalar (*velocit
 			contact->posFrom1, contact->posFrom2,
 			arbiter->orthoDir);
 	}
-}
-
-Tin_Scalar
-tin_alignof_v12(const Tin_Scalar a[12], const Tin_Scalar b[12])
-{
-	Tin_Scalar aSq = tin_dot_v12(a, a);
-	Tin_Scalar bSq = tin_dot_v12(b, b);
-	Tin_Scalar abLen = sqrt(aSq * bSq);
-	Tin_Scalar proj = tin_dot_v12(a, b);
-	Tin_Scalar projScaled = abLen <= TIN_EPSILON ? 0.0 : (proj / abLen);
-	return MAX(projScaled, 0.0);
 }
 
 void
@@ -864,23 +644,6 @@ tin_simulate(Tin_Scene *scene, Tin_Scalar dt, double (*gettime)(), double timing
 	startTime = gettime ? gettime() : 0.0;
 	// Cache this frames contacts for the next frame
 	tin_reset_pairtable(&scene->contactCache);
-	/*
-	for (size_t i = 0; i < numArbiters; i++) {
-		Tin_CachedContact *cachedContact = calloc(1, sizeof *cachedContact);
-		cachedContact->face1 = arbiters[i].face1;
-		cachedContact->face2 = arbiters[i].face2;
-		cachedContact->numPoints = arbiters[i].numContacts;
-		for (int p = 0; p < arbiters[i].numContacts; p++) {
-			Tin_CachedContactPoint *cachedPoint = &cachedContact->points[p];
-			cachedPoint->posFrom1 = arbiters[i].contacts[p].posFrom1;
-			cachedPoint->posFrom2 = arbiters[i].contacts[p].posFrom2;
-			cachedPoint->magnitudeAccums[0] = arbiters[i].contacts[p].ineqAccum;
-			cachedPoint->magnitudeAccums[1] = arbiters[i].contacts[p].tangentAccum;
-			cachedPoint->magnitudeAccums[2] = arbiters[i].contacts[p].bitangentAccum;
-		}
-		tin_insert_pair(&scene->contactCache, (uintptr_t)arbiters[i].body1, (uintptr_t)arbiters[i].body2, cachedContact);
-	}
-	*/
 	scene->numOldArbiters = scene->numArbiters;
 	scene->capOldArbiters = scene->capArbiters;
 	scene->oldArbiters = realloc(scene->oldArbiters, scene->capOldArbiters * sizeof *scene->oldArbiters);

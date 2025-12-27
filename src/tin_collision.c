@@ -68,6 +68,38 @@ const Tin_ShapeClass tin_shape_sphere = {
 };
 
 Tin_Vec3
+tin_polytope_support(const void *geometry, Tin_Vec3 dir)
+{
+	const Tin_Polytope *polytope = geometry;
+	Tin_Scalar bestScore = -INFINITY;
+	int bestIdx = -1;
+	for (int idx = 0; idx < polytope->numVertices; idx++) {
+		Tin_Scalar score = tin_dot_v3(polytope->vertices[idx], dir);
+		if (score > bestScore) {
+			bestScore = score;
+			bestIdx   = idx;
+		}
+	}
+	return polytope->vertices[bestIdx];
+}
+
+Tin_Vec3
+tin_polysum_support(const void *geometry, Tin_Vec3 dir)
+{
+	const Tin_Polysum *s = geometry;
+
+	Tin_Vec3 former_dir = tin_bwtrf_dir(s->transform1, dir);
+	Tin_Vec3 relTo1 = tin_polytope_support(s->polytope1, former_dir);
+	Tin_Vec3 former_abs = tin_fwtrf_point(s->transform1, relTo1);
+
+	Tin_Vec3 latter_dir = tin_bwtrf_dir(s->transform2, tin_neg_v3(dir));
+	Tin_Vec3 relTo2 = tin_polytope_support(s->polytope2, latter_dir);
+	Tin_Vec3 latter_abs = tin_fwtrf_point(s->transform2, relTo2);
+
+	return tin_sub_v3(former_abs, latter_abs);
+}
+
+Tin_Vec3
 tin_shape_polytope_get_inv_inertia(const void *shape)
 {
 	const Tin_Polytope *polytope = shape;

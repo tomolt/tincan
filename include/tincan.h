@@ -223,10 +223,6 @@ void tin_fill_arbiter(
 	Tin_Vec3 refNormal, Tin_Scalar refBase,
 	Tin_Vec3 *manifold, int count,
 	Tin_Arbiter *arbiter);
-int tin_polytope_collide(
-	const Tin_Polytope *pa, const Tin_Transform *ta,
-	const Tin_Polytope *pb, const Tin_Transform *tb,
-	Tin_Arbiter *arbiter);
 
 /// @}
 
@@ -256,21 +252,6 @@ typedef struct {
 	Tin_Constraint1D tangentConstraint1;
 	Tin_Constraint1D tangentConstraint2;
 } Tin_Contact;
-
-/*
-typedef struct {
-	Tin_Vec3 posFrom1;
-	Tin_Vec3 posFrom2;
-	Tin_Scalar magnitudeAccums[3];
-} Tin_CachedContactPoint;
-
-typedef struct {
-	int face1;
-	int face2;
-	Tin_CachedContactPoint points[TIN_MAX_CONTACTS];
-	int numPoints;
-} Tin_CachedContact;
-*/
 
 typedef struct Tin_Arbiter {
 	int bodyID1;
