@@ -39,6 +39,7 @@ typedef struct Tin_Vec3 {
 	Tin_Scalar c[3];
 } Tin_Vec3;
 
+/// Initialize a Tin_Vec3 with the given component values.
 #define TIN_VEC3(x, y, z) (Tin_Vec3){{x,y,z}}
 
 /// Invert the direction of a 3D vector.
@@ -88,7 +89,12 @@ Tin_Vec3 tin_bwtrf_dir  (const Tin_Transform *transform, Tin_Vec3 vec);
 /// \defgroup polytope Polytopes
 /// @{
 
+typedef struct Tin_ShapeClass Tin_ShapeClass;
+
 typedef struct {
+	const Tin_ShapeClass *vtable;
+	Tin_Vec3   invInertia;
+	Tin_Scalar boundRadius;
 	Tin_Vec3  *vertices;
 	int       *faceIndices;
 	int       *faceOffsets;
@@ -104,36 +110,32 @@ Tin_Vec3 tin_polytope_support(const void *geometry, Tin_Vec3 dir);
 /// \defgroup shape Collision Shapes
 /// @{
 
-#define TIN_MAKE_SHAPE_CODE(str) ((str)[0] | ((str)[1] << 8) | ((str)[2] << 16) | ((str)[3] << 24))
-
-#define TIN_SHAPE_CODE_SPHERE   TIN_MAKE_SHAPE_CODE("SPHE")
-#define TIN_SHAPE_CODE_POLYTOPE TIN_MAKE_SHAPE_CODE("PTOP")
+#define TIN_SHAPE_CODE_SPHERE   0x53504845u // 'SPHE' in little-endian ASCII
+#define TIN_SHAPE_CODE_POLYTOPE 0x50544F50u // 'PTOP' in little-endian ASCII
 
 typedef uint32_t Tin_ShapeCode;
+typedef struct Tin_Arbiter Tin_Arbiter;
 
 typedef struct Tin_ShapeClass {
 	Tin_ShapeCode code;
-	void (*aabb)(const void *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax);
-	bool (*intersect)(const void *shape, const Tin_Transform *transform, const void *otherShape, const Tin_Transform *otherTransform);
+	Tin_Vec3 (*get_inv_inertia)(const void *shape);
+	void (*get_aabb)(const void *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax);
+	bool (*intersect)(const void *shape, const Tin_Transform *transform, const void *otherShape, const Tin_Transform *otherTransform, Tin_Arbiter *arbiter);
 } Tin_ShapeClass;
 
-#define TIN_SPHERE   's'
-#define TIN_POLYTOPE 'p'
+typedef struct {
+	const Tin_ShapeClass *vtable;
+} Tin_Shape;
 
 typedef struct {
-	Tin_ShapeClass *vtable;
-	Tin_Vec3   invInertia;
+	const Tin_ShapeClass *vtable;
 	Tin_Scalar radius;
-	int        kind;
-	union {
-		Tin_Polytope polytope;
-	};
-} Tin_Shape;
+} Tin_Sphere;
 
 void tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_Vec3 *aabbMin, Tin_Vec3 *aabbMax);
 
-extern const Tin_ShapeClass tin_shape_class_sphere;
-extern const Tin_ShapeClass tin_shape_class_polytope;
+extern const Tin_ShapeClass tin_shape_sphere;
+extern const Tin_ShapeClass tin_shape_polytope;
 
 /// @}
 

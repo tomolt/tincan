@@ -119,9 +119,9 @@ tin_sweep_prune_update(Tin_SweepPrune *sap)
 		for (size_t e = 0; e < axis->numEvents; e++) {
 			Tin_SweepEvent *event = &axis->events[e];
 			const Tin_Body *body = &sap->scene->bodyTable[event->bodyID];
-			Tin_Vec3 origin = body->transform.translation;
-			Tin_Scalar radius = body->shape->radius * body->transform.scale;
-			event->value = origin.c[a] + (event->isMin ? -radius : radius);
+			Tin_Vec3 aabbMin, aabbMax;
+			body->shape->vtable->get_aabb(body->shape, &body->transform, &aabbMin, &aabbMax);
+			event->value = event->isMin ? aabbMin.c[a] : aabbMax.c[a];
 		}
 	}
 
@@ -208,6 +208,7 @@ tin_sweep_prune(Tin_SweepPrune *sap,
 
 	free(bloomFilter);
 
+#if 0
 	/* Eliminate false positives */
 	size_t w = 0;
 	for (size_t i = 0; i < numColliders; i += 2) {
@@ -223,6 +224,7 @@ tin_sweep_prune(Tin_SweepPrune *sap,
 		}
 	}
 	numColliders = w;
+#endif
 
 	*collidersOut = colliders;
 	*numCollidersOut = numColliders;

@@ -28,10 +28,10 @@ static Camera camera;
 static Object objects[MAX_OBJECTS];
 static int    num_objects;
 
-static Tin_Shape cone_shape;
-static Model     cone_model;
-static Tin_Shape cube_shape;
-static Model     cube_model;
+static Tin_Polytope cone_shape;
+static Model        cone_model;
+static Tin_Polytope cube_shape;
+static Model        cube_model;
 
 static float time_multiplier = 1.0f;
 
@@ -63,10 +63,10 @@ init_cone(int tessel)
 		indices[6*v+5] = tessel + 1;
 	}
 
-	cone_shape.kind = TIN_POLYTOPE;
-	cone_shape.polytope.vertices = verts;
-	cone_shape.polytope.numVertices = nverts;
-	cone_shape.radius = 1.5f;
+	cone_shape.vtable = &tin_shape_polytope;
+	cone_shape.vertices = verts;
+	cone_shape.numVertices = nverts;
+	cone_shape.boundRadius = 1.5f;
 	Tin_Scalar r = 1.0f, h = 2.0f;
 	cone_shape.invInertia = (Tin_Vec3) {{
 		1.0 / (3.0 / 80.0 * (h * h + 4.0 * r * r)),
@@ -126,14 +126,14 @@ init_cube(void)
 		{{ 1.0, 0.0, 0.0}},
 	};
 
-	cube_shape.kind = TIN_POLYTOPE;
-	cube_shape.polytope.vertices = verts;
-	cube_shape.polytope.numVertices = 8;
-	cube_shape.polytope.faceIndices = faceIndices;
-	cube_shape.polytope.faceOffsets = faceOffsets;
-	cube_shape.polytope.faceNormals = faceNormals;
-	cube_shape.polytope.numFaces = 6;
-	cube_shape.radius = sqrtf(3.0f);
+	cube_shape.vtable = &tin_shape_polytope;
+	cube_shape.vertices = verts;
+	cube_shape.numVertices = 8;
+	cube_shape.faceIndices = faceIndices;
+	cube_shape.faceOffsets = faceOffsets;
+	cube_shape.faceNormals = faceNormals;
+	cube_shape.numFaces = 6;
+	cube_shape.boundRadius = sqrtf(3.0f);
 	cube_shape.invInertia = (Tin_Vec3) {{ 6.0f, 6.0f, 6.0f }};
 	
 	cube_model = render_make_model(8, verts, 6 * 6, indices);
@@ -291,7 +291,7 @@ main(void)
 	};
 	*/
 
-	Tin_BodyID bodyID2 = tin_add_body(&scene, &cube_shape, 1.0 / 3.0);
+	Tin_BodyID bodyID2 = tin_add_body(&scene, (const Tin_Shape *)&cube_shape, 1.0 / 3.0);
 	Tin_Body *body2 = &scene.bodyTable[bodyID2];
 	body2->transform.translation = TIN_VEC3(0.0, -1.0, 0.0);
 	body2->velocity = TIN_VEC3(-3, 1, 0);
@@ -301,7 +301,7 @@ main(void)
 		{{ 1.0f, 0.5f, 0.5f }}
 	};
 
-	Tin_BodyID bodyID3 = tin_add_body(&scene, &cube_shape, 0.0);
+	Tin_BodyID bodyID3 = tin_add_body(&scene, (const Tin_Shape *)&cube_shape, 0.0);
 	Tin_Body *body3 = &scene.bodyTable[bodyID3];
 	body3->transform.translation = TIN_VEC3(0.0, -23.0, 0.0);
 	body3->transform.scale = 20.0;
@@ -323,7 +323,7 @@ main(void)
 					printf("Cannot spawn box: too many objects already present.\n");
 				} else {
 					Tin_Vec3 forward = {{ -cam->rotation[6], -cam->rotation[7], -cam->rotation[8] }};
-					Tin_BodyID bodyID = tin_add_body(&scene, &cube_shape, 1.0 / 1.0);
+					Tin_BodyID bodyID = tin_add_body(&scene, (const Tin_Shape *)&cube_shape, 1.0 / 1.0);
 					Tin_Body *body = &scene.bodyTable[bodyID];
 					memcpy(body->transform.rotation, cam->rotation, sizeof cam->rotation);
 					body->transform.translation = tin_saxpy_v3(1.0, forward, cam->position);

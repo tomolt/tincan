@@ -63,6 +63,7 @@ tin_polysum_support(const void *geometry, Tin_Vec3 dir)
 	return tin_sub_v3(former_abs, latter_abs);
 }
 
+#if 0
 /* === Shapes === :shape: */
 
 void
@@ -92,6 +93,7 @@ tin_shape_aabb(const Tin_Shape *shape, const Tin_Transform *transform, Tin_Vec3 
 		abort();
 	}
 }
+#endif
 
 /* === Contact Points === :contact: */
 
@@ -190,6 +192,53 @@ tin_reduce_manifold(Tin_Vec3 *points, int count)
 		memmove(points + idx, points + idx + 1, (count - idx) * sizeof *points);
 	}
 	return count;
+}
+
+
+void
+tin_fill_arbiter(
+	const Tin_Transform *ta, const Tin_Transform *tb,
+	int faceA, int faceB,
+	Tin_Vec3 refNormal, Tin_Scalar refBase,
+	Tin_Vec3 *manifold, int count,
+	Tin_Arbiter *arbiter)
+{
+	// Fill out the Arbiter structure with contact point information.
+	arbiter->normal = refNormal;
+	arbiter->face1 = faceA;
+	arbiter->face2 = faceB;
+	memset(arbiter->contacts, 0, count * sizeof *arbiter->contacts);
+	arbiter->numContacts = count;
+	for (int i = 0; i < count; i++) {
+		Tin_Contact *contact = &arbiter->contacts[i];
+		Tin_Scalar projDist = tin_dot_v3(refNormal, manifold[i]) - refBase;
+		Tin_Vec3 projPoint = tin_saxpy_v3(-projDist, refNormal, manifold[i]);
+		contact->posFrom1 = tin_sub_v3(projPoint, ta->translation);
+		contact->posFrom2 = tin_sub_v3(manifold[i], tb->translation);
+		Tin_Vec3 p1 = projPoint;
+		Tin_Vec3 p2 = manifold[i];
+		contact->separation = tin_dot_v3(refNormal, tin_sub_v3(p2, p1));
+	}
+
+	// Swap around contact points so that the ones that penetrate are at the front of the array.
+	for (int n = count; n > 1; n--) {
+		for (int i = 0; i < n - 1; i++) {
+			if (arbiter->contacts[i].separation >= 0.0 && !(arbiter->contacts[i+1].separation >= 0.0)) {
+				Tin_Contact temp = arbiter->contacts[i];
+				arbiter->contacts[i] = arbiter->contacts[i+1];
+				arbiter->contacts[i+1] = temp;
+			}
+		}
+	}
+
+	// Find out how many penetrating contact points there are.
+	int numPenetrating = 0;
+	for (int i = 0; i < count; i++) {
+		if (!(arbiter->contacts[i].separation >= 0.0)) {
+			numPenetrating++;
+		}
+	}
+	arbiter->numPenetrating = numPenetrating;
 }
 
 int
@@ -600,12 +649,13 @@ tin_scene_update(Tin_Scene *scene)
 		Tin_Body *body = &scene->bodyTable[i];
 
 		Tin_Scalar *rotation = body->transform.rotation;
+		Tin_Vec3 invInertia = body->shape->vtable->get_inv_inertia(body->shape);
 
 		/* Compute product = rotation * inertia_local^-1 */
 		Tin_Scalar factor = body->invMass / (body->transform.scale * body->transform.scale);
 		Tin_Scalar product[3*3];
 		for (int j = 0; j < 3; j++) {
-			Tin_Scalar diagonalEntry = factor * body->shape->invInertia.c[j];
+			Tin_Scalar diagonalEntry = factor * invInertia.c[j];
 			product[3*j+0] = rotation[3*j+0] * diagonalEntry;
 			product[3*j+1] = rotation[3*j+1] * diagonalEntry;
 			product[3*j+2] = rotation[3*j+2] * diagonalEntry;
@@ -690,9 +740,11 @@ tin_narrowphase(Tin_Scene *scene)
 		Tin_Arbiter *arbiter = &scene->arbiters[i];
 		Tin_Body *body1 = &scene->bodyTable[arbiter->bodyID1];
 		Tin_Body *body2 = &scene->bodyTable[arbiter->bodyID2];
-		arbiter->numContacts = tin_polytope_collide(
-				&body1->shape->polytope, &body1->transform,
-				&body2->shape->polytope, &body2->transform, &scene->arbiters[i]);
+		arbiter->numContacts = 0;
+		body1->shape->vtable->intersect(
+				body1->shape, &body1->transform,
+				body2->shape, &body2->transform,
+				&scene->arbiters[i]);
 	}
 	size_t numOut = 0;
 	for (size_t i = 0; i < scene->numArbiters; i++) {
